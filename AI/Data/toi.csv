@@ -11,7 +11,7 @@
 # COLUMN st_teff:        Stellar Effective Temperature Value [K]
 # COLUMN st_rad:         Stellar Radius Value [R_Sun]
 #
-loc_rowid,pl_orbper,pl_trandurh,pl_rade,pl_insol,pl_eqt,st_teff,st_rad
+loc_rowid,period,tranDur,radE,earthFlux,eqTemp,effTemp,radS
 1,2.1713484,2.0172196,5.8181633,22601.9485814,3127.2040524,10249.0000000,2.1698600
 2,1.9316462,3.1660000,11.2154000,44464.5000000,4045.0000000,7070.0000000,2.0100000
 3,1.8675574,1.4080000,23.7529000,2860.6100000,2037.0000000,8924.0000000,5.7300000
