@@ -1,0 +1,7 @@
+# period:     Orbital Period [days]
+# tranDur:   Transit Duration [hrs]
+# radE:       Planetary Radius [Earth radii]
+# earthFlux:      Insolation Flux [Earth flux]
+# eqTemp:        Equilibrium Temperature [K]
+# effTemp:      Stellar Effective Temperature [K]
+# radS:       Stellar Radius [Solar radii]

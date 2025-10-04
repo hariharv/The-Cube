@@ -17,21 +17,84 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\AI\New Cumulative KOI\cumulative_2025.10.04_11.56.26.csv">
+        <entry key="\AI\data\New Cumulative KOI\cumulative_2025.10.04_13.21.12.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
             </Attribute>
           </value>
         </entry>
-        <entry key="\AI\New K2\k2pandc_2025.10.04_11.56.20.csv">
+        <entry key="\AI\data\New TOI\TOI_2025.10.04_13.20.49.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
             </Attribute>
           </value>
         </entry>
-        <entry key="\AI\New TOI\TOI_2025.10.04_11.56.12.csv">
+        <entry key="\AI\data\New TOI\toi.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\AI\data\k2.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\AI\data\kepler.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\AI\data\merged.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\AI\data\merged1.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\AI\data\toi.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\AI\data\yes.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\AI\remaining_70.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\AI\sample_30.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\AI\sampled_output.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
