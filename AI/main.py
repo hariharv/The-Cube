@@ -7,18 +7,18 @@ from keras import layers
 import matplotlib.pyplot as plt
 import pandas as pd
 from keras import ops
-#if not os.path.exists('ExoModel.h5'):
-inputs = keras.Input(shape=(7,))
-layer1 = layers.Dense(8, activation='relu')
-layer2 = layers.Dense(16, activation='relu')
-layer3 = layers.Dense(8, activation='relu')
+#if not os.path.exists('Mod8-16-8.h5'):
+inputs = keras.Input(shape=(8,))
+layer1 = layers.Dense(16, activation='relu')
+layer2 = layers.Dense(32, activation='relu')
+layer3 = layers.Dense(16, activation='relu')
 layerOut = layers.Dense(1, activation='sigmoid')
 output = layerOut(layer3(layer2(layer1(inputs))))
-model = keras.Model(inputs=inputs, outputs=output, name = 'ExoModel')
-keras.saving.save_model(model, "ExoModel.h5")
+model = keras.Model(inputs=inputs, outputs=output, name = 'Mod8-16-8')
+keras.saving.save_model(model, "Mod8-16-8.h5")
 del model
 
-model = keras.models.load_model("ExoModel.h5")
+model = keras.models.load_model("Mod8-16-8.h5")
 model.summary()
 
 model.compile(optimizer=keras.optimizers.Adam(learning_rate=0.0005), loss=keras.losses.BinaryCrossentropy(), metrics=['accuracy'])
@@ -37,13 +37,14 @@ yEval = xEval[:,0]
 xEval = xEval[:, 1:]
 
 scaler = StandardScaler()
-xData = scaler.fit_transform(xData)
+scaler = scaler.fit(xData)
+xData = scaler.transform(xData)
 xEval = scaler.transform(xEval)
 
 history = model.fit(xData, yData, validation_data=(xEval, yEval), batch_size=64, epochs=200, verbose=1)
 evals = model.evaluate(xEval, yEval, verbose=1)
 print("Loss, Accuracy: ", evals)
-model.save("ExoModel.h5")
+model.save("Mod8-16-8.h5")
 del model
 
 plt.plot(history.history['accuracy'], label='Train Acc')
