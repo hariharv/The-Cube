@@ -103,6 +103,57 @@ html, body, .stApp { background: var(--bg); color: var(--text); }
   font-size: 16px;
 }
 
+/* --- Large banner style for THE CUBE --- */
+.hero-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 18px;
+    background: linear-gradient(180deg, #000000 0%, #0b0b0b 100%);
+    border-radius: 14px;
+    margin: 6px auto 18px;
+    max-width: 1200px;
+    box-shadow: 0 8px 40px rgba(2,6,23,0.7);
+    position: relative;
+}
+.hero-banner::before{
+    content: "";
+    position: absolute;
+    left: 18px;
+    top: 18px;
+    bottom: 18px;
+    width: 6px;
+    border-radius: 4px;
+    background: linear-gradient(180deg,#ff2d95,#7c3aed);
+    opacity: 0.95;
+}
+.cube-title {
+    margin: 0;
+    color: #ffffff;
+    font-weight: 800;
+    font-size: 72px;
+    letter-spacing: 8px;
+    text-transform: uppercase;
+    line-height: 0.95;
+    text-shadow: 0 4px 30px rgba(0,0,0,0.7);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+}
+.cube-subtitle {
+    margin: 6px 0 0;
+    color: #cbd5e1;
+    font-size: 13px;
+    letter-spacing: 8px;
+    text-transform: uppercase;
+    opacity: 0.9;
+}
+
+.hero-banner .hero-info {
+    margin-top: 8px;
+    color: #cbd5e1;
+    max-width: 980px;
+    font-size: 14px;
+}
+
 /* Fixed cube logo */
 #cube-logo {
   position: fixed; left: 14px; top: 12px; width: 56px; z-index: 9999;
@@ -156,17 +207,16 @@ def idx_for(columns, *candidates) -> int:
 
 # ---------- Hero (centered title + description) ----------
 st.markdown(
-    """
-<div class='hero'>
-  <h1>The Cube — Exoplanet Data Visualizer</h1>
-  <p>
-    NASA Space Apps Challenge project. Explore exoplanet candidates with a consistent dark UI,
-    clear 2D/3D plots, and compact distributions. Confirmed exoplanets are highlighted with a red ring; 
-    model confidence uses a white → Blues gradient.
-  </p>
+        """
+<div class='hero-banner'>
+    <div style='text-align:left; max-width:920px;'>
+        <h1 class='cube-title'>The Cube</h1>
+        <div class='cube-subtitle'>Exoplanet Analyzer</div>
+        
+    
 </div>
 """,
-    unsafe_allow_html=True,
+        unsafe_allow_html=True,
 )
 
 # ---------- Fixed cube logo ----------
@@ -541,12 +591,41 @@ with tab3:
             st.plotly_chart(fig_bar, use_container_width=True, config=dict(displaylogo=False))
 
 with tab4:
-    st.markdown(
-        "<div class='dark-card'><h2 style='margin:.25rem 0'>Model Performance</h2>"
-        "<p>Coming soon: metrics, ROC, precision/recall, and per-run comparisons.</p></div>",
-        unsafe_allow_html=True,
-    )
+    st.markdown("<h2>Model Performance</h2>", unsafe_allow_html=True)
 
+    # Where to look for images
+    IMAGE_DIR = APP_DIR / "images"
+    IMAGE_DIR.mkdir(exist_ok=True)  # safe if it already exists
+
+    # Support both names/locations
+    candidates = [
+        ("Accuracy", [APP_DIR / "Accuracy.png", IMAGE_DIR / "Accuracy.png"]),
+        ("Model Loss", [APP_DIR / "Model Loss.png", IMAGE_DIR / "Model Loss.png"]),
+    ]
+
+    cols = st.columns(2)
+    any_found = False
+
+    for col, (title, paths) in zip(cols, candidates):
+        img_path = next((p for p in paths if p.is_file()), None)
+        with col:
+            st.markdown(f"<div class='dark-card'><h3 style='margin:.25rem 0'>{title}</h3>", unsafe_allow_html=True)
+            if img_path:
+                any_found = True
+                st.image(str(img_path), use_container_width=True, caption=f"{title} over epochs")
+            else:
+                st.warning(
+                    f"Could not find **{title}.png**. "
+                    f"Place it at `{APP_DIR}` or `{IMAGE_DIR}`."
+                )
+            st.markdown("</div>", unsafe_allow_html=True)
+
+    if not any_found:
+        st.info(
+            "Tip: export your training curves as **Accuracy.png** and **Model Loss.png**. "
+            "You can also store them under `Streamlit/images/`."
+        )
+    
 # ---------- Compare Model (embed HTML) ----------
 with tab5:
     st.markdown("<h2>Compare Model vs Actual Data (HTML)</h2>", unsafe_allow_html=True)
