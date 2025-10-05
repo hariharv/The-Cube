@@ -26,7 +26,7 @@ yEval = xEval[:,0]
 xEval = xEval[:, 1:]
 
 
-fin = model.fit(xData, yData, batch_size=32, epochs=1000, verbose=1)
+fin = model.fit(xData, yData, batch_size=32, epochs=100, verbose=1)
 evals = model.evaluate(xEval, yEval, verbose=1)
 print("Loss, Accuracy: ", evals)
 model.save("ExoModel.h5")

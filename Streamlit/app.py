@@ -1,12 +1,26 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from pathlib import Path
 
 # NASA SpaceApps UI: Add cube logo to sidebar and top of each tab
 st.set_page_config(page_title="Exoplanet Data Visualizer", layout="wide")
 
+# ---- Paths & helpers (define ONCE and reuse) ----
+APP_DIR = Path(__file__).resolve().parent
+LOGO_PATH = APP_DIR / "cube_logo.png"   # change to (APP_DIR / "assets" / "cube_logo.png") if you move it
+
+def show_logo(*, width=None, use_container_width=False):
+    """Render the logo safely on Streamlit Cloud."""
+    if LOGO_PATH.is_file():
+        st.image(str(LOGO_PATH), width=width, use_container_width=use_container_width)
+    else:
+        st.warning(f"Logo not found at: {LOGO_PATH}")
+        # If you prefer hard-fail when missing logo, uncomment:
+        # st.stop()
+
 with st.sidebar:
-    st.image("cube_logo.png", use_column_width=True)
+    show_logo(use_container_width=True)  
     st.markdown("### NASA SpaceApps Challenge")
     st.markdown("#### The Cube Project")
     st.markdown("---")
@@ -14,7 +28,7 @@ with st.sidebar:
 tab1, tab2, tab3, tab4 = st.tabs(["About Us", "Project Information", "Visualization", "Model Performance"])
 
 with tab1:
-    st.image("cube_logo.png", width=120)
+    show_logo(width=120)   
     st.title("About Us")
     st.markdown("""
     **The Cube**  
@@ -23,7 +37,7 @@ with tab1:
     """)
 
 with tab2:
-    st.image("cube_logo.png", width=120)
+    show_logo(width=120)
     st.title("Project Information")
     st.markdown("""
     **Project Goal:**  
@@ -41,7 +55,7 @@ with tab2:
     """)
 
 with tab3:
-    st.image("cube_logo.png", width=120)
+    show_logo(width=120)
     st.title("Data Visualization")
     st.markdown("Upload a NASA Exoplanet Archive CSV and explore trends in actual exoplanets.")
 
@@ -148,7 +162,7 @@ with tab3:
             st.plotly_chart(fig_hist, use_container_width=True)
 
 with tab4:
-    st.image("cube_logo.png", width=120)
+    show_logo(width=120)
     st.title("Model Performance")
     st.markdown("""
     **Coming Soon:**  
