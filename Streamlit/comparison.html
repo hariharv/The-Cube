@@ -2,74 +2,98 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Exoplanet — Actual vs Model (Blues Gradient & Red Rings)</title>
+  <title>Exoplanet — Actual vs Model (Dark UI)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <style>
-    :root { --gap: 12px; --border: #222; --muted: #a3a3a3; }
+    :root { --gap: 12px; --muted: #a3a3a3; --bg: #0e1117; --panel: #111827; --text:#e5e7eb; }
     * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; background: #0b0b0f; color: #e5e7eb;
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text);
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
     header {
-      position: sticky; top: 0; z-index: 10; background: #0b0b0f; border-bottom: 1px solid rgba(255,255,255,0.08);
+      position: sticky; top: 0; z-index: 10; background: var(--bg);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
       padding: 12px; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
     }
     header h1 { margin: 0 0 4px; font-size: 18px; font-weight: 700; color: #fff; }
     header .hint { margin: 0; color: var(--muted); font-size: 13px; }
     .controls { display: grid; grid-auto-flow: column; gap: 8px; align-items: center; }
-    .controls input[type="file"], .controls select {
-      padding: 6px 8px; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; background: #111319; color: #e5e7eb;
+    .controls input[type="file"], .controls select, .controls button {
+      padding: 6px 8px; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; background: #101826; color: var(--text);
     }
     .controls button {
-      padding: 8px 12px; background: #2563eb; color: #fff; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
-      cursor: pointer; font-weight: 600;
+      background: #2563eb; color: #fff; cursor: pointer; font-weight: 600;
     }
     main { padding: var(--gap); display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); min-height: calc(100vh - 88px); }
     .panel { display: flex; flex-direction: column; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px;
-      background: linear-gradient(180deg, rgba(18,20,28,0.9), rgba(10,10,14,0.9)); overflow: hidden; min-height: 0; }
+      background: var(--panel); overflow: hidden; min-height: 0; position: relative; }
     .panel .title { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.08); font-weight: 700; color: #fff;
-      display: flex; justify-content: space-between; align-items: center; }
+      display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .title .actions { display: inline-flex; gap: 8px; }
+    .title .actions button { background: #374151; color: #e5e7eb; border: 1px solid rgba(255,255,255,0.1); padding: 6px 10px; border-radius: 8px; cursor: pointer; }
     .plot { width: 100%; height: 62vh; min-height: 360px; }
-    .legend-box { padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.08); display: grid; gap: 6px; }
+    .legend-box { padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.08); display: grid; gap: 6px; color: var(--muted); }
     .legend-title { font-size: 12px; color: #d1d5db; }
     .legend-bar { height: 14px; border-radius: 6px; background: linear-gradient(90deg, #dbeafe 0%, #60a5fa 60%, #1e3a8a 100%);
       border: 1px solid rgba(255,255,255,0.15); }
     .legend-ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
     @media (max-width: 980px) { main { grid-template-columns: 1fr; } .plot { height: 48vh; } }
+    .fs { position: fixed !important; inset: 0 !important; z-index: 9999 !important; border-radius: 0 !important; }
+    .fs .plot { height: 100% !important; }
   </style>
 </head>
 <body>
   <header>
     <div>
-      <h1>Actual vs Model</h1>
-      <p class="hint">Left: actual (categorical). Right: model with three bands — <strong>white</strong> (&lt;0.25), <strong>Blues gradient</strong> (0.25–0.75), <strong>dark blue</strong> (≥0.75). Confirmed → <strong>red ring</strong>.</p>
+      <h1>Actual vs Model (Upload CSV here)</h1>
+      <p class="hint">Left: neutral gray + red rings (confirmed). Right: model — <strong>white</strong> (&lt;0.25), <strong>Blues</strong> (0.25–0.75), <strong>dark blue</strong> (≥0.75).</p>
     </div>
     <div class="controls">
       <input id="fileInput" type="file" accept=".csv" />
       <select id="xSelect"></select>
       <select id="ySelect"></select>
+      <select id="trimLow">
+        <option value="0">0%</option>
+        <option value="1" selected>1%</option>
+        <option value="2">2%</option>
+        <option value="5">5%</option>
+      </select>
+      <select id="trimHigh">
+        <option value="95">95%</option>
+        <option value="97">97%</option>
+        <option value="99" selected>99%</option>
+        <option value="100">100%</option>
+      </select>
       <button id="plotBtn" type="button">Plot</button>
     </div>
   </header>
 
   <main>
-    <section class="panel">
-      <div class="title"><span>Actual Distribution</span><span class="hint" id="leftInfo"></span></div>
+    <section class="panel" id="panelLeft">
+      <div class="title">
+        <span>Actual Distribution</span>
+        <span class="actions"><button type="button" onclick="toggleFS('panelLeft')">Fullscreen</button></span>
+      </div>
       <div id="leftPlot" class="plot"></div>
       <div class="legend-box">
         <div class="legend-title">Legend</div>
-        <div class="hint">Colored by <code>actual_label</code> (categorical).</div>
+        <div>Neutral gray points; confirmed objects overlaid with a red ring.</div>
+        <span id="leftInfo"></span>
       </div>
     </section>
 
-    <section class="panel">
-      <div class="title"><span>Model Prediction</span><span class="hint" id="rightInfo"></span></div>
+    <section class="panel" id="panelRight">
+      <div class="title">
+        <span>Model Prediction</span>
+        <span class="actions"><button type="button" onclick="toggleFS('panelRight')">Fullscreen</button></span>
+      </div>
       <div id="rightPlot" class="plot"></div>
       <div class="legend-box">
         <div class="legend-title">Candidates — Confidence(+)</div>
         <div class="legend-bar" aria-label="Confidence gradient (light→dark blue)"></div>
         <div class="legend-ticks"><span>0.25</span><span>0.50</span><span>0.75</span></div>
+        <span id="rightInfo"></span>
       </div>
     </section>
   </main>
@@ -85,24 +109,17 @@
     const leftInfo = document.getElementById('leftInfo');
     const rightInfo = document.getElementById('rightInfo');
 
+    const trimLowSel = document.getElementById('trimLow');
+    const trimHighSel = document.getElementById('trimHigh');
+
     fileInput.addEventListener('change', onFile);
     btnPlot.addEventListener('click', render);
 
-    function onFile(e) {
-      const f = e.target.files && e.target.files[0];
-      if (!f) return;
-      Papa.parse(f, {
-        header: true, dynamicTyping: true, skipEmptyLines: true,
-        complete: res => {
-          rows = res.data || [];
-          allCols = res.meta?.fields || Object.keys(rows[0] || {});
-          numCols = inferNumericColumns(rows, allCols);
-          fillSelect(xSelect, numCols, guess(numCols, 'period'));
-          fillSelect(ySelect, numCols, Math.min(1, numCols.length - 1));
-          leftInfo.textContent = `${rows.length} rows · ${allCols.length} cols`;
-          rightInfo.textContent = `bands: <0.25 / 0.25–0.75 / ≥0.75 · color=confidence_positive`;
-        }
-      });
+    function toggleFS(id){
+      const el = document.getElementById(id);
+      el.classList.toggle('fs');
+      const plotId = (id === 'panelLeft') ? 'leftPlot' : 'rightPlot';
+      setTimeout(()=>{ Plotly.Plots.resize(document.getElementById(plotId)); }, 150);
     }
 
     function inferNumericColumns(r, cols) {
@@ -119,6 +136,45 @@
     function fillSelect(sel, opts, idx=0){ sel.innerHTML=''; opts.forEach((o,i)=>{ const op=document.createElement('option'); op.value=o; op.textContent=o; if(i===idx) op.selected=true; sel.appendChild(op); }); }
     function guess(list, key){ const i=list.findIndex(c=>c.toLowerCase()===String(key).toLowerCase()); return i>=0?i:0; }
 
+    function percentile(arr, p){
+      if(!arr.length) return NaN;
+      const a = [...arr].sort((a,b)=>a-b);
+      const idx = (p/100)*(a.length-1);
+      const lo = Math.floor(idx), hi = Math.ceil(idx);
+      if (lo===hi) return a[lo];
+      const w = idx - lo;
+      return a[lo]*(1-w) + a[hi]*w;
+    }
+    function filterByPercentiles(xs, ys, lo, hi){
+      const px_lo = percentile(xs, lo), px_hi = percentile(xs, hi);
+      const py_lo = percentile(ys, lo), py_hi = percentile(ys, hi);
+      const keep = [];
+      for (let i=0;i<xs.length;i++){
+        if (xs[i] >= px_lo && xs[i] <= px_hi && ys[i] >= py_lo && ys[i] <= py_hi) keep.push(i);
+      }
+      return keep;
+    }
+
+    function onFile(e) {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      Papa.parse(f, {
+        header: true, dynamicTyping: true, skipEmptyLines: true,
+        complete: res => {
+          rows = res.data || [];
+          allCols = res.meta?.fields || Object.keys(rows[0] || {});
+          numCols = inferNumericColumns(rows, allCols);
+          // Defaults: X=period, Y=tranDur (fallbacks if missing)
+          fillSelect(xSelect, numCols, guess(numCols, 'period'));
+          const yIdx = (guess(numCols, 'tranDur') >= 0) ? guess(numCols, 'tranDur')
+                     : (guess(numCols, 'trandur') >= 0 ? guess(numCols, 'trandur') : Math.min(1, numCols.length - 1));
+          fillSelect(ySelect, numCols, yIdx);
+          leftInfo.textContent = `${rows.length} rows · ${allCols.length} cols`;
+          rightInfo.textContent = `bands: <0.25 / 0.25–0.75 / ≥0.75 · color=confidence_positive`;
+        }
+      });
+    }
+
     function render(){
       if(!rows.length){ alert('Upload a CSV first.'); return; }
       const x = xSelect.value, y = ySelect.value;
@@ -128,95 +184,112 @@
         const xv=r[x], yv=r[y];
         if(isNum(xv) && isNum(yv)){
           X.push(xv); Y.push(yv);
-          actual.push(r.actual_label ?? null);
+          actual.push(r.actual_label ?? r.disposition ?? r.koi_disposition ?? r.label ?? null);
           conf.push(isNum(r.confidence_positive) ? r.confidence_positive : null);
         }
       }
 
-      // LEFT: actual (categorical colors)
-      const palette = ['#60a5fa','#f59e0b','#10b981','#f472b6','#a78bfa','#ef4444','#22d3ee','#eab308','#84cc16','#fb7185'];
-      const leftColors = actual.map(v=>{
-        if(v===null) return 'rgba(180,180,190,0.35)';
-        const key = String(v);
-        let h = 0; for(let i=0;i<key.length;i++) h = (h*31 + key.charCodeAt(i))>>>0;
-        return palette[h % palette.length];
-      });
-      const leftTrace = {
-        type:'scattergl', mode:'markers', x:X, y:Y,
-        marker:{ size:7, color:leftColors, line:{width:0.4, color:'rgba(255,255,255,0.6)'} },
-        hovertemplate:`${x}=%{x}<br>${y}=%{y}<extra></extra>`, name:'Actual'
+      const lo = parseInt(trimLowSel.value, 10);
+      const hi = parseInt(trimHighSel.value, 10);
+      const keepIdx = filterByPercentiles(X, Y, lo, hi);
+
+      // Trimmed arrays
+      const Xt = keepIdx.map(i=>X[i]);
+      const Yt = keepIdx.map(i=>Y[i]);
+      const actualT = keepIdx.map(i=>actual[i]);
+      const confT = keepIdx.map(i=>conf[i]);
+
+      // LEFT: neutral gray + red rings
+      const grayX=[], grayY=[], ringX=[], ringY=[];
+      for (let i=0;i<Xt.length;i++){
+        grayX.push(Xt[i]); grayY.push(Yt[i]);
+        const v = actualT[i];
+        const isConf = (typeof v==='number') ? (v===1) : (v!==null && String(v).toLowerCase().includes('confirm'));
+        if(isConf){ ringX.push(Xt[i]); ringY.push(Yt[i]); }
+      }
+      const leftDots = {
+        type:'scattergl', mode:'markers', x:grayX, y:grayY, name:'All objects',
+        marker:{ size:3.2, color:'rgba(203,213,225,0.85)', line:{width:0.3, color:'rgba(0,0,0,0.25)'} },
+        hovertemplate:`${x}=%{x}<br>${y}=%{y}<extra></extra>`
       };
-      Plotly.newPlot('leftPlot', [leftTrace], {template:'plotly_dark', margin:{l:50,r:20,t:20,b:50}, xaxis:{title:x}, yaxis:{title:y}}, {responsive:true});
+      const leftRings = {
+        type:'scattergl', mode:'markers', x:ringX, y:ringY, name:'Confirmed (ring)',
+        marker:{ size:6, color:'rgba(0,0,0,0)', line:{width:1.5, color:'red'} },
+        hovertemplate:`${x}=%{x}<br>${y}=%{y}<extra>confirmed</extra>`
+      };
+      const layoutL = { template:'plotly_dark', margin:{l:50,r:20,t:20,b:50}, xaxis:{title:x}, yaxis:{title:y}, uirevision:'keep',
+                        paper_bgcolor:'#0e1117', plot_bgcolor:'#0f172a', font:{color:'#e5e7eb'} };
+      const config = { displaylogo:false, scrollZoom:true, doubleClick:'reset',
+                       modeBarButtonsToAdd:['toggleSpikelines','hovercompare','v1hovermode'] };
+      Plotly.newPlot('leftPlot', [leftDots, leftRings], layoutL, config);
 
-      // RIGHT: three bands + red rings for confirmed
-      const thrLow  = 0.25;
-      const thrHigh = 0.75;
+      // RIGHT: three bands + red rings
+      const thrLow  = 0.25, thrHigh = 0.75;
 
-      const maskCandidate = conf.map(v => (v !== null && v >= thrLow && v < thrHigh));
-      const maskPlanet    = conf.map(v => (v !== null && v >= thrHigh));
-      const maskNot       = conf.map((v,i) => !(maskCandidate[i] || maskPlanet[i]));
+      const maskCandidate = confT.map(v => (v !== null && v >= thrLow && v < thrHigh));
+      const maskPlanet    = confT.map(v => (v !== null && v >= thrHigh));
+      const maskNot       = confT.map((v,i) => !(maskCandidate[i] || maskPlanet[i]));
 
       const Xnot=[], Ynot=[], Xcand=[], Ycand=[], Ccand=[], Xplan=[], Yplan=[];
-      for (let i=0;i<X.length;i++){
-        if (maskNot[i])         { Xnot.push(X[i]);  Ynot.push(Y[i]); }
-        else if (maskCandidate[i]) { Xcand.push(X[i]); Ycand.push(Y[i]); Ccand.push(conf[i]); }
-        else if (maskPlanet[i])    { Xplan.push(X[i]); Yplan.push(Y[i]); }
+      for (let i=0;i<Xt.length;i++){
+        if (maskNot[i])            { Xnot.push(Xt[i]);  Ynot.push(Yt[i]); }
+        else if (maskCandidate[i]) { Xcand.push(Xt[i]); Ycand.push(Yt[i]); Ccand.push(confT[i]); }
+        else if (maskPlanet[i])    { Xplan.push(Xt[i]); Yplan.push(Yt[i]); }
       }
 
       const whiteTrace = {
         type:'scattergl', mode:'markers', x:Xnot, y:Ynot,
         name:`Not exoplanet (< ${thrLow.toFixed(2)})`,
-        marker:{ color:'white', size:7, line:{width:0.4, color:'rgba(0,0,0,0.3)'} },
+        marker:{ color:'white', size:3.2, line:{width:0.3, color:'rgba(0,0,0,0.3)'} },
         hovertemplate:`${x}=%{x}<br>${y}=%{y}<extra></extra>`
       };
-
       const candTrace = {
         type:'scattergl', mode:'markers', x:Xcand, y:Ycand,
         name:`Candidate [${thrLow.toFixed(2)}, ${thrHigh.toFixed(2)})`,
         marker:{
-          size:7, color:Ccand, colorscale:'Blues', cmin:thrLow, cmax:thrHigh, showscale:true,
-          colorbar:{ title:'Confidence+' }, line:{width:0.4, color:'rgba(255,255,255,0.6)'}
+          size:3.2, color:Ccand, colorscale:'Blues', cmin:thrLow, cmax:thrHigh, showscale:true,
+          colorbar:{ title:'Confidence+' }, line:{width:0.3, color:'rgba(255,255,255,0.6)'}
         },
         hovertemplate:`${x}=%{x}<br>${y}=%{y}<br>conf+=%{marker.color:.2f}<extra></extra>`
       };
-
       const planTrace = {
         type:'scattergl', mode:'markers', x:Xplan, y:Yplan,
         name:`Exoplanet (≥ ${thrHigh.toFixed(2)})`,
-        marker:{ size:7, color:'#1e3a8a', line:{width:0.4, color:'rgba(255,255,255,0.6)'} },
+        marker:{ size:3.2, color:'#1e3a8a', line:{width:0.3, color:'rgba(255,255,255,0.6)'} },
         hovertemplate:`${x}=%{x}<br>${y}=%{y}<extra>exoplanet</extra>`
       };
 
-      // Confirmed ring overlay: from actual_label (string 'confirm' or numeric==1)
-      const ringX=[], ringY=[];
-      for(let i=0;i<actual.length;i++){
-        const v = actual[i];
+      const ringX2=[], ringY2=[];
+      for(let i=0;i<actualT.length;i++){
+        const v = actualT[i];
         const isConf = (typeof v==='number') ? (v===1) : (v!==null && String(v).toLowerCase().includes('confirm'));
-        if(isConf){ ringX.push(X[i]); ringY.push(Y[i]); }
+        if(isConf){ ringX2.push(Xt[i]); ringY2.push(Yt[i]); }
       }
       const ringTrace = {
-        type:'scattergl', mode:'markers', x:ringX, y:ringY, name:'Confirmed (ring)',
-        marker:{ size:10, color:'rgba(0,0,0,0)', line:{width:2, color:'red'} },
+        type:'scattergl', mode:'markers', x:ringX2, y:ringY2, name:'Confirmed (ring)',
+        marker:{ size:6, color:'rgba(0,0,0,0)', line:{width:1.5, color:'red'} },
         hovertemplate:`${x}=%{x}<br>${y}=%{y}<extra>confirmed</extra>`
       };
 
-      Plotly.newPlot('rightPlot', [whiteTrace, candTrace, planTrace, ringTrace],
-        {template:'plotly_dark', margin:{l:50,r:20,t:20,b:50}, xaxis:{title:x}, yaxis:{title:y}},
-        {responsive:true});
-      leftInfo.textContent  = `x=${x}, y=${y} · color=actual_label`;
-      rightInfo.textContent = `x=${x}, y=${y} · bands: <${thrLow} / ${thrLow}-${thrHigh} / ≥${thrHigh}`;
+      const layoutR = { template:'plotly_dark', margin:{l:50,r:20,t:20,b:50}, xaxis:{title:x}, yaxis:{title:y}, uirevision:'keep',
+                        paper_bgcolor:'#0e1117', plot_bgcolor:'#0f172a', font:{color:'#e5e7eb'} };
+      Plotly.newPlot('rightPlot', [whiteTrace, candTrace, planTrace, ringTrace], layoutR, config);
+
+      leftInfo.textContent  = `x=${x}, y=${y} · trimmed ${lo}–${hi}% · neutral gray + red ring`;
+      rightInfo.textContent = `x=${x}, y=${y} · trimmed ${lo}–${hi}% · bands: <${thrLow} / ${thrLow}-${thrHigh} / ≥${thrHigh}`;
     }
 
-    // Optional autoload via URL (?csv=data/predicted.csv)
     (function autoload(){
       const p=new URLSearchParams(location.search); const url=p.get('csv');
       if(!url) return;
       fetch(url).then(r=>r.text()).then(text=>{
         const res=Papa.parse(text,{header:true,dynamicTyping:true,skipEmptyLines:true});
         rows=res.data||[]; allCols=res.meta?.fields||Object.keys(rows[0]||{}); 
-        numCols = (function(r, cols){ return cols.filter(c=>{let n=0,ok=0;for(const x of r){if(x[c]!==undefined&&x[c]!==null&&x[c]!==''){n++; if(typeof x[c]==='number'&&isFinite(x[c])) ok++;}} return n>=5&&ok/Math.max(1,n)>=0.9;});})(rows, allCols);
-        fillSelect(xSelect, numCols, numCols.findIndex(c=>c.toLowerCase()==='period')>=0?numCols.findIndex(c=>c.toLowerCase()==='period'):0);
-        fillSelect(ySelect, numCols, Math.min(1, numCols.length-1));
+        numCols = inferNumericColumns(rows, allCols);
+        fillSelect(xSelect, numCols, guess(numCols, 'period'));
+        const yIdx = (guess(numCols, 'tranDur') >= 0) ? guess(numCols, 'tranDur')
+                   : (guess(numCols, 'trandur') >= 0 ? guess(numCols, 'trandur') : Math.min(1, numCols.length-1));
+        fillSelect(ySelect, numCols, yIdx);
         leftInfo.textContent = `${rows.length} rows · ${allCols.length} cols`;
         rightInfo.textContent = `bands: <0.25 / 0.25–0.75 / ≥0.75 · color=confidence_positive`;
       }).catch(()=>{});

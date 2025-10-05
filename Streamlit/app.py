@@ -1,15 +1,16 @@
-import streamlit as st
+import base64
+import json
+from pathlib import Path
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import base64
-from pathlib import Path
-import json
+import streamlit as st
 import streamlit.components.v1 as components
 
-# Repo-aware paths (app is inside /Streamlit)
+# ---------- Repo-aware paths ----------
 REPO_ROOT = Path(__file__).resolve().parent.parent
-ART_DIR = REPO_ROOT / "artifacts"   # each run has predictions.jsonl + metrics.json
+ART_DIR = REPO_ROOT / "artifacts"  # optional: model runs live here
 
 def list_runs():
     if not ART_DIR.exists():
@@ -17,7 +18,7 @@ def list_runs():
     return sorted(
         [p for p in ART_DIR.iterdir() if p.is_dir() and (p / "predictions.jsonl").exists()],
         key=lambda p: p.stat().st_mtime,
-        reverse=True
+        reverse=True,
     )
 
 def load_predictions(run_dir: Path) -> pd.DataFrame:
@@ -41,465 +42,520 @@ def load_metrics(run_dir: Path) -> dict:
         return {}
     return json.loads(path.read_text(encoding="utf-8"))
 
-# ---- Define paths early ----
+# ---------- Paths / assets ----------
 APP_DIR = Path(__file__).resolve().parent
 LOGO_PATH = APP_DIR / "cube_logo.png"
-background_path = Path(__file__).parent / "stars_bg.png"
+SAMPLE_CSV = APP_DIR / "data" / "predicted.csv"  # bundled dataset option
 
-# --- Inject starry background (fallback to radial gradient) ---
-if background_path.exists():
-    st.markdown(
-        f"""
-        <style>
-        .stApp {{
-            background-image: url("data:image/png;base64,{background_path.read_bytes().hex()}");
-            background-size: cover;
-            background-attachment: fixed;
-            background-position: center;
-            background-repeat: no-repeat;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-else:
-    st.markdown(
-        """
-        <style>
-        .stApp {
-            background: radial-gradient(circle at 20% 20%, #000010, #000020, #000000);
-            background-attachment: fixed;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+# ---------- Page config ----------
+st.set_page_config(
+    page_title="The Cube — Exoplanet Visualizer",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
-st.set_page_config(page_title="Exoplanet Data Visualizer", layout="wide")
-
-# ---- Global CSS (dark, starfield look) ----
-_CSS = r"""
+# ---------- Global CSS (clean, organized dark theme) ----------
+st.markdown(
+    """
 <style>
-html, body, .stApp { background: #000; color: #e6e6e6; }
-.stApp:before {
-    content: ""; position: fixed; left:0; top:0; right:0; bottom:0; z-index:-1;
-    background-image:
-        radial-gradient(circle at 3% 10%, rgba(255,255,255,0.95) 1px, transparent 2px),
-        radial-gradient(circle at 12% 30%, rgba(255,255,255,0.9) 1px, transparent 2px),
-        radial-gradient(circle at 20% 60%, rgba(255,255,255,0.85) 1px, transparent 2px),
-        radial-gradient(circle at 30% 15%, rgba(255,255,255,0.9) 1px, transparent 2px),
-        radial-gradient(circle at 40% 50%, rgba(255,255,255,0.8) 1px, transparent 2px),
-        radial-gradient(circle at 50% 80%, rgba(255,255,255,0.75) 1px, transparent 2px),
-        radial-gradient(circle at 60% 35%, rgba(255,255,255,0.7) 1px, transparent 2px),
-        radial-gradient(circle at 68% 10%, rgba(255,255,255,0.6) 1px, transparent 2px),
-        radial-gradient(circle at 78% 55%, rgba(255,255,255,0.65) 1px, transparent 2px),
-        radial-gradient(circle at 85% 25%, rgba(255,255,255,0.5) 1px, transparent 2px),
-        radial-gradient(circle at 92% 70%, rgba(255,255,255,0.45) 1px, transparent 2px);
-    background-repeat: repeat; opacity:0.95; filter: blur(0.2px);
-    animation: twinkle 10s ease-in-out infinite;
+:root {
+  --bg: #0e1117;          /* charcoal */
+  --panel: #111827;       /* slate */
+  --panel-2: #0f172a;     /* deep slate */
+  --muted: #a3a3a3;
+  --text: #e5e7eb;
+  --border: rgba(255,255,255,0.08);
 }
-@keyframes twinkle { 0%{opacity:0.9} 50%{opacity:1} 100%{opacity:0.9} }
-#cube-logo { position: fixed; left: 14px; top: 12px; width: 56px; z-index: 9999; border-radius: 6px;
-             box-shadow: 0 6px 24px rgba(0,0,0,0.75); }
+html, body, .stApp { background: var(--bg); color: var(--text); }
+.block-container { padding-top: 1.0rem; }
+
+/* Hide sidebar and toggle */
+[data-testid="stSidebar"]{ display:none !important; }
+[data-testid="collapsedControl"]{ display:none !important; }
+
+/* Cards */
+.dark-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.dark-card.tight { padding: 10px 12px; }
+
+/* Centered hero */
+.hero {
+  text-align: center;
+  padding: 8px 12px 18px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.hero h1 {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.25;
+  color: #f3f4f6;
+}
+.hero p {
+  margin: 8px auto 0;
+  max-width: 900px;
+  color: #cbd5e1;
+  font-size: 16px;
+}
+
+/* Fixed cube logo */
+#cube-logo {
+  position: fixed; left: 14px; top: 12px; width: 56px; z-index: 9999;
+  border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+}
+
+/* Hide default chrome for a cleaner look */
 header, footer, #MainMenu { visibility: hidden; }
 </style>
-"""
-css_file = APP_DIR / "static" / "styles.css"
-if css_file.is_file():
-    st.markdown(f"<style>{css_file.read_text()}</style>", unsafe_allow_html=True)
-else:
-    st.markdown(_CSS, unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
-# ----------------------------- #
-# Axis explanations
-# ----------------------------- #
+# ---------- Axis explanations ----------
 AXIS_INFO = {
-    "koi_period": "Orbital period — days per full orbit around the host star.",
-    "koi_duration": "Transit duration — hours the planet takes to cross the star.",
-    "koi_depth": "Transit depth — fractional drop in brightness during transit.",
-    "koi_prad": "Planet radius — in Earth radii (R⊕).",
-    "koi_teq": "Equilibrium temperature — blackbody estimate in Kelvin.",
-    "koi_insol": "Incident flux — stellar energy received vs. Earth (S⊕).",
-    "koi_steff": "Stellar effective temperature — surface temperature (K).",
-    "koi_srad": "Stellar radius — in solar radii (R☉).",
-    "koi_slogg": "Stellar surface gravity — log(g) in cgs units.",
-    "koi_smet": "Stellar metallicity — [Fe/H] dex.",
-
     "period": "Orbital period — time to orbit the star once (days).",
-    "period_days": "Orbital period — time to orbit the star once (days).",
+    "koi_period": "Orbital period — days per full orbit around the host star.",
+    "trandur": "Transit duration — transit length (hours).",
+    "koi_duration": "Transit duration — hours the planet takes to cross the star.",
     "duration": "Transit duration — transit length (hours).",
     "duration_hrs": "Transit duration — transit length (hours).",
-    "depth_ppm": "Transit depth — brightness drop in parts-per-million.",
     "rp_re": "Planet radius — Earth radii (R⊕).",
+    "rade": "Planet radius — Earth radii (R⊕).",
+    "koi_prad": "Planet radius — Earth radii (R⊕).",
     "teq": "Equilibrium temperature — blackbody estimate in Kelvin.",
     "teq_k": "Equilibrium temperature — Kelvin.",
-    "srad": "Stellar radius — solar radii (R☉).",
-    "teff": "Stellar effective temperature — surface temperature (K).",
+    "koi_teq": "Equilibrium temperature — Kelvin.",
     "insol": "Incident flux — relative to Earth (S⊕).",
-    "semi_major_axis": "Orbital semi-major axis — average star–planet distance (AU).",
-    "eccentricity": "Orbital eccentricity — deviation from a circular orbit.",
-    "impact_param": "Impact parameter — transit chord across the stellar disk.",
+    "koi_insol": "Incident flux — relative to Earth (S⊕).",
+    "teff": "Stellar effective temperature — surface temperature (K).",
+    "koi_steff": "Stellar effective temperature — surface temperature (K).",
+    "srad": "Stellar radius — solar radii (R☉).",
+    "rads": "Stellar radius — solar radii (R☉).",
+    "koi_srad": "Stellar radius — solar radii (R☉).",
     "snr": "Signal-to-noise ratio — detection strength.",
-
-    "class": "Predicted/true class label — e.g., confirmed, candidate, or false_positive.",
-    "trandur": "Transit duration — transit length (hours).",
-    "rade": "Planet radius — in Earth radii (R⊕).",
-    "earthflux": "Incident stellar flux received by the planet relative to Earth (S⊕).",
-    "eqtemp": "Equilibrium temperature — estimated blackbody temperature (K).",
-    "efftemp": "Stellar effective temperature — surface temperature of the host star (K).",
-    "rads": "Stellar radius — in solar radii (R☉).",
+    "class": "Label — e.g., confirmed, candidate, or false positive.",
+    "confidence_positive": "Model confidence for 'positive' (exoplanet) class (0–1).",
 }
-
 def explain_axis(name: str) -> str:
     if not isinstance(name, str):
         return "Feature description unavailable."
     key = name.strip()
     return AXIS_INFO.get(key, AXIS_INFO.get(key.lower(), f"{name.replace('_', ' ').capitalize()} — feature description unavailable."))
 
-# Sidebar
-with st.sidebar:
-    st.markdown("# The Cube")
-    st.markdown("### NASA SpaceApps Challenge")
-    st.markdown("---")
+def idx_for(columns, *candidates) -> int:
+    cols_lower = [c.lower() for c in columns]
+    for cand in candidates:
+        if cand and cand.lower() in cols_lower:
+            return cols_lower.index(cand.lower())
+    return 0
 
-# Hero
-with st.container():
-    left, right = st.columns([3,1])
-    with left:
-        st.markdown("# <span style='font-size:44px;color:#ffffff'>Exoplanet Data Visualizer</span>", unsafe_allow_html=True)
-        st.markdown("<p style='color:#cfcfcf; font-size:18px'>Explore candidate exoplanets with dark, immersive visuals — curated plots, 3D views, and model performance overlays.</p>", unsafe_allow_html=True)
-        st.markdown("<div style='margin-top:12px'><em style='color:#9a9a9a'>Tip:</em> upload a CSV in the Visualization tab to begin.</div>", unsafe_allow_html=True)
-    with right:
-        pass
+# ---------- Hero (centered title + description) ----------
+st.markdown(
+    """
+<div class='hero'>
+  <h1>The Cube — Exoplanet Data Visualizer</h1>
+  <p>
+    NASA Space Apps Challenge project. Explore exoplanet candidates with a consistent dark UI,
+    clear 2D/3D plots, and compact distributions. Confirmed exoplanets are highlighted with a red ring; 
+    model confidence uses a white → Blues gradient.
+  </p>
+</div>
+""",
+    unsafe_allow_html=True,
+)
 
-# Fixed cube logo
+# ---------- Fixed cube logo ----------
 if LOGO_PATH.is_file():
     try:
-        with open(LOGO_PATH, 'rb') as f:
-            b64 = base64.b64encode(f.read()).decode('utf-8')
+        with open(LOGO_PATH, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("utf-8")
         st.markdown(f"<img id='cube-logo' src='data:image/png;base64,{b64}' alt='cube'/>", unsafe_allow_html=True)
     except Exception:
-        st.sidebar.image(str(LOGO_PATH), width=80)
+        pass
 
-# Tabs (added "Compare Model")
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["About Us", "Project Information", "Visualization", "Model Performance", "Compare Model"])
+# ---------- Tabs ----------
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    ["About Us", "Project Information", "Visualization", "Model Performance", "Compare Model"]
+)
 
 with tab1:
-    st.title("About Us")
-    st.markdown("""
-    **The Cube**  
-    We are a team passionate about exoplanet discovery and determining habitability.  
-    This website proposes a novel AI/ML model for determining whether a celestial body is an exoplanet and provides cross-reference with NASA Exoplanet Archive data.
-    """)
+    st.markdown(
+        "<div class='dark-card'><h2 style='margin:.25rem 0'>About Us</h2>"
+        "<p><strong>The Cube</strong> — a team exploring exoplanet discovery and habitability. "
+        "We visualize NASA archive data and compare against our ML model.</p></div>",
+        unsafe_allow_html=True,
+    )
 
 with tab2:
-    st.title("Project Information")
-    st.markdown("""
-    **Project Goal:**  
-    To provide an interactive platform for visualizing and confirming exoplanet candidates from NASA archives.
+    st.markdown(
+        "<div class='dark-card'><h2 style='margin:.25rem 0'>Project Information</h2>"
+        "<p><strong>Goal:</strong> Provide an interactive platform for visualizing and confirming exoplanet candidates.</p>"
+        "<ul><li>Supported archives: Kepler, K2, TOI (CSV)</li>"
+        "<li>Features: 2D/3D scatter, curated histograms, compact model-vs-actual summary</li></ul></div>",
+        unsafe_allow_html=True,
+    )
 
-    **Supported Data:**  
-    - Kepler, K2, TOI CSVs  
-    - Columns: Orbital period, transit duration, planet radius, insolation flux, equilibrium temperature, stellar temperature, stellar radius, etc.
+# ----------------------- Visualization (Sample OR Upload) -----------------------
+def trim_by_percentiles(df: pd.DataFrame, cols: list[str], lo: int, hi: int) -> pd.DataFrame:
+    """Return filtered copy keeping only rows within [lo, hi] percentile for each numeric col in cols."""
+    if not cols:
+        return df
+    out = df
+    for c in cols:
+        if c not in out.columns or not pd.api.types.is_numeric_dtype(out[c]):
+            continue
+        qlo, qhi = out[c].quantile(lo/100.0), out[c].quantile(hi/100.0)
+        out = out[(out[c] >= qlo) & (out[c] <= qhi)]
+    return out
 
-    **Features:**  
-    - 2D/3D scatter plots  
-    - Histograms  
-    - Customizable axes  
-    - Model performance tab (for future ML integration)
-    """)
-
-# ----------------------------- #
-# Visualization (three-band rules + red ring)
-# ----------------------------- #
 with tab3:
-    st.title("Data Visualization")
-    st.markdown("Upload a NASA Exoplanet Archive CSV or your model output CSV (e.g. `predicted.csv`).")
+    st.markdown("<h2>Visualization</h2>", unsafe_allow_html=True)
 
-    uploaded_file = st.file_uploader("Upload CSV file", type=["csv"]) 
+    source = st.radio(
+        "Choose data source",
+        options=["Sample data (recommended)", "Upload CSV"],
+        index=0,
+        horizontal=True,
+        help="Use the built-in sample, or upload your own CSV with similar columns.",
+    )
 
-    if uploaded_file:
-        df = pd.read_csv(uploaded_file, comment='#', skip_blank_lines=True)
+    df = None
+    if source == "Sample data (recommended)":
+        if not SAMPLE_CSV.is_file():
+            st.error(f"Sample file not found: {SAMPLE_CSV}. Put a CSV at 'Streamlit/data/predicted.csv'.")
+        else:
+            df = pd.read_csv(SAMPLE_CSV, comment="#", skip_blank_lines=True)
+    else:
+        uploaded = st.file_uploader("Upload CSV file", type=["csv"])
+        if uploaded:
+            df = pd.read_csv(uploaded, comment="#", skip_blank_lines=True)
+        else:
+            st.info("Upload a CSV to continue.")
 
-        numeric_cols = df.select_dtypes(include='number').columns.tolist()
+    if df is not None:
+        numeric_cols = df.select_dtypes(include="number").columns.tolist()
         all_cols = df.columns.tolist()
-        object_cols = [c for c in all_cols if df[c].dtype == 'object']
 
-        st.write("### "+uploaded_file.name+" Data", df.head())
-
-        # Label/Disposition column detection
+        # Confirmed (ring) detection
         lower_map = {c.lower(): c for c in all_cols}
-        preferred_order = ["predicted_label", "actual_label", "koi_disposition", "disposition", "class", "label", "status"]
-        default_label_col = next((lower_map[name] for name in preferred_order if name in lower_map), None)
-        small_num_cols = [c for c in all_cols if pd.api.types.is_numeric_dtype(df[c]) and df[c].nunique() <= 10]
-        label_candidates = list(dict.fromkeys(([default_label_col] if default_label_col else []) + object_cols + small_num_cols))
-        label_candidates = [c for c in label_candidates if c is not None]
-        label_col = st.selectbox("Label/Disposition column", options=label_candidates) if label_candidates else None
+        preferred = ["actual_label", "koi_disposition", "disposition", "class", "label", "status"]
+        label_col = next((lower_map[n] for n in preferred if n in lower_map), None)
 
-        # Confirmed mask (string contains 'confirm' or numeric equals chosen 'confirmed value')
         if label_col is not None and pd.api.types.is_numeric_dtype(df[label_col]):
-            uniq = sorted(pd.Series(df[label_col].dropna().unique()).tolist())
-            default_idx = uniq.index(1) if 1 in uniq else 0
-            confirm_value = st.selectbox("Which numeric value means 'confirmed'?", options=uniq, index=default_idx, help="Used to draw the red ring around confirmed exoplanets.")
-            mask_confirmed = (df[label_col] == confirm_value)
+            base_confirmed = (df[label_col] == 1)
         elif label_col is not None:
-            mask_confirmed = df[label_col].astype(str).str.lower().str.contains("confirm")
+            base_confirmed = df[label_col].astype(str).str.lower().str.contains("confirm")
         else:
-            mask_confirmed = pd.Series([False] * len(df))
+            base_confirmed = pd.Series([False] * len(df), index=df.index)
 
-        # Confidence column + fixed thresholds for three bands
-        has_conf = ("confidence_positive" in df.columns) and pd.api.types.is_numeric_dtype(df["confidence_positive"])
+        # --- Axis controls + scaling & trimming options ---
+        x_default = idx_for(numeric_cols, "period", "koi_period")
+        y_default = idx_for(numeric_cols, "tranDur", "trandur", "koi_duration", "duration", "duration_hrs")
+        z_default = idx_for(numeric_cols, "rade", "rp_re", "koi_prad", "teq", "teq_k")
+
+        st.markdown("<div class='dark-card'>", unsafe_allow_html=True)
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            x_axis = st.selectbox("X-axis", numeric_cols, index=x_default, help="Select X feature")
+        with c2:
+            y_axis = st.selectbox("Y-axis", numeric_cols, index=y_default, help="Select Y feature")
+        with c3:
+            z_axis = st.selectbox("3D Z-axis", numeric_cols, index=z_default, help="Select Z feature")
+
+        c4, c5 = st.columns([1,1])
+        with c4:
+            lock_2d_equal = st.checkbox(
+                "Lock 2D aspect ratio (equal scale)",
+                value=False,
+                help="Keeps the same scale for X and Y in 2D to avoid distortion."
+            )
+        with c5:
+            scaling_mode = st.selectbox(
+                "3D axis scaling",
+                options=["Equal cube (same scale)", "Data-driven (proportional)", "Normalize to 0–1 (for selected axes)"],
+                index=0,
+                help="Choose how the 3D axes are scaled."
+            )
+
+        # --- Trim outliers controls ---
+        st.markdown("<div class='dark-card tight'>", unsafe_allow_html=True)
+        trim_c1, trim_c2, trim_c3 = st.columns([1,1,1])
+        with trim_c1:
+            trim_low = st.slider("Percentile lower bound", min_value=0, max_value=10, value=1, step=1,
+                                 help="Points below this percentile (per axis) are removed.")
+        with trim_c2:
+            trim_high = st.slider("Percentile upper bound", min_value=90, max_value=100, value=99, step=1,
+                                  help="Points above this percentile (per axis) are removed.")
+        with trim_c3:
+            apply_trim = st.checkbox("Focus on dense region (trim outliers)", value=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        with st.expander("Axis explanations", expanded=False):
+            st.markdown(
+                f"- **X-axis ({x_axis})** — {explain_axis(x_axis)}\n"
+                f"- **Y-axis ({y_axis})** — {explain_axis(y_axis)}\n"
+                f"- **Z-axis ({z_axis})** — {explain_axis(z_axis)}"
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # ---------- Prepare working (trimmed) DataFrame ----------
+        df_plot = df.copy()
+        if apply_trim:
+            df_plot = trim_by_percentiles(df_plot, [x_axis, y_axis, z_axis], trim_low, trim_high)
+
+        # Recompute masks on trimmed frame
+        if label_col is not None and pd.api.types.is_numeric_dtype(df_plot[label_col]):
+            mask_confirmed = (df_plot[label_col] == 1)
+        elif label_col is not None:
+            mask_confirmed = df_plot[label_col].astype(str).str.lower().str.contains("confirm")
+        else:
+            mask_confirmed = pd.Series([False] * len(df_plot), index=df_plot.index)
+
+        has_conf = "confidence_positive" in df_plot.columns and pd.api.types.is_numeric_dtype(df_plot["confidence_positive"])
         LOW_THR, HIGH_THR = 0.25, 0.75
-        st.markdown(f"**Banding:** not exoplanet: < {LOW_THR}, candidate: [{LOW_THR}, {HIGH_THR}), exoplanet: ≥ {HIGH_THR}")
-
-        # 2D Scatter
-        st.subheader("2D Scatter Plot")
-        if len(numeric_cols) == 0:
-            st.warning("No numeric columns found.")
+        if has_conf:
+            conf = df_plot["confidence_positive"]
+            mask_not  = conf < LOW_THR
+            mask_cand = (conf >= LOW_THR) & (conf < HIGH_THR)
+            mask_plan = conf >= HIGH_THR
         else:
-            x_axis = st.selectbox("X-axis", numeric_cols, index=0 if 'period' in numeric_cols else 0, help="Select numeric feature for X-axis")
-            y_axis = st.selectbox("Y-axis", numeric_cols, index=1 if len(numeric_cols) > 1 else 0, help="Select numeric feature for Y-axis")
+            mask_not  = pd.Series([True] * len(df_plot), index=df_plot.index)
+            mask_cand = pd.Series([False] * len(df_plot), index=df_plot.index)
+            mask_plan = pd.Series([False] * len(df_plot), index=df_plot.index)
 
-            st.markdown(f"""
-            **Axis Explanation:**  
-            - **X-axis ({x_axis})** — {explain_axis(x_axis)}  
-            - **Y-axis ({y_axis})** — {explain_axis(y_axis)}  
-            - **Color Rules:**  
-              - Not exoplanet: **white** (confidence &lt; {LOW_THR})  
-              - Candidate: **Blues gradient** (confidence in [{LOW_THR}, {HIGH_THR}))  
-              - Exoplanet (model): **solid dark blue** (confidence ≥ {HIGH_THR})  
-              - Confirmed: **red ring overlay**
-            """)
+        st.markdown(
+            "<div class='dark-card tight' style='margin-bottom:12px'>"
+            "<strong>Color rules:</strong> white &lt; 0.25 · Blues 0.25–0.75 · dark blue ≥ 0.75 · red ring = confirmed"
+            "</div>",
+            unsafe_allow_html=True,
+        )
 
-            if has_conf:
-                conf = df["confidence_positive"]
-                mask_not   = conf < LOW_THR
-                mask_cand  = (conf >= LOW_THR) & (conf < HIGH_THR)
-                mask_plan  = conf >= HIGH_THR
-            else:
-                mask_not  = pd.Series([True] * len(df))
-                mask_cand = pd.Series([False] * len(df))
-                mask_plan = pd.Series([False] * len(df))
-
-            # Smaller dots (2D)
-            trace_not = go.Scatter(
-                x=df.loc[mask_not, x_axis],
-                y=df.loc[mask_not, y_axis],
+        # -------------------- 2D scatter --------------------
+        traces = [
+            go.Scatter(
+                x=df_plot.loc[mask_not, x_axis],
+                y=df_plot.loc[mask_not, y_axis],
                 mode="markers",
                 name=f"Not exoplanet (< {LOW_THR:.2f})",
-                marker=dict(color="white", size=3.5, line=dict(width=0.3, color="rgba(0,0,0,0.3)")),
-                hovertemplate=f"{x_axis}=%{{x}}<br>{y_axis}=%{{y}}<extra></extra>"
+                marker=dict(color="white", size=3.0, line=dict(width=0.3, color="rgba(0,0,0,0.3)")),
+                hovertemplate=f"{x_axis}=%{{x}}<br>{y_axis}=%{{y}}<extra></extra>",
             )
-            traces = [trace_not]
-
-            if mask_cand.any():
-                trace_cand = go.Scatter(
-                    x=df.loc[mask_cand, x_axis],
-                    y=df.loc[mask_cand, y_axis],
+        ]
+        if mask_cand.any():
+            traces.append(
+                go.Scatter(
+                    x=df_plot.loc[mask_cand, x_axis],
+                    y=df_plot.loc[mask_cand, y_axis],
                     mode="markers",
                     name=f"Candidate [{LOW_THR:.2f}, {HIGH_THR:.2f})",
                     marker=dict(
-                        size=3.5,
-                        color=df.loc[mask_cand, "confidence_positive"],
+                        size=3.0,
+                        color=df_plot.loc[mask_cand, "confidence_positive"],
                         colorscale="Blues",
-                        cmin=LOW_THR, cmax=HIGH_THR,
+                        cmin=LOW_THR,
+                        cmax=HIGH_THR,
                         showscale=True,
                         colorbar=dict(title="Confidence+"),
-                        line=dict(width=0.3, color="rgba(255,255,255,0.6)")
+                        line=dict(width=0.3, color="rgba(255,255,255,0.6)"),
                     ),
-                    hovertemplate=f"{x_axis}=%{{x}}<br>{y_axis}=%{{y}}<br>conf+=%{{marker.color:.2f}}<extra></extra>"
+                    hovertemplate=f"{x_axis}=%{{x}}<br>{y_axis}=%{{y}}<br>conf+=%{{marker.color:.2f}}<extra></extra>",
                 )
-                traces.append(trace_cand)
-
-            if mask_plan.any():
-                trace_plan = go.Scatter(
-                    x=df.loc[mask_plan, x_axis],
-                    y=df.loc[mask_plan, y_axis],
+            )
+        if mask_plan.any():
+            traces.append(
+                go.Scatter(
+                    x=df_plot.loc[mask_plan, x_axis],
+                    y=df_plot.loc[mask_plan, y_axis],
                     mode="markers",
                     name=f"Exoplanet (≥ {HIGH_THR:.2f})",
-                    marker=dict(
-                        size=3.5,
-                        color="#1e3a8a",
-                        line=dict(width=0.3, color="rgba(255,255,255,0.6)")
-                    ),
-                    hovertemplate=f"{x_axis}=%{{x}}<br>{y_axis}=%{{y}}<extra>exoplanet</extra>"
+                    marker=dict(size=3.0, color="#1e3a8a", line=dict(width=0.3, color="rgba(255,255,255,0.6)")),
+                    hovertemplate=f"{x_axis}=%{{x}}<br>{y_axis}=%{{y}}<extra>exoplanet</extra>",
                 )
-                traces.append(trace_plan)
-
-            # Confirmed ring overlay (RED ring) — slightly larger but still subtle
-            if mask_confirmed.any():
-                trace_ring = go.Scatter(
-                    x=df.loc[mask_confirmed, x_axis],
-                    y=df.loc[mask_confirmed, y_axis],
+            )
+        if mask_confirmed.any():
+            traces.append(
+                go.Scatter(
+                    x=df_plot.loc[mask_confirmed, x_axis],
+                    y=df_plot.loc[mask_confirmed, y_axis],
                     mode="markers",
                     name="Confirmed (ring)",
-                    marker=dict(
-                        size=6,
-                        color="rgba(0,0,0,0)",
-                        line=dict(width=1.5, color="red")
-                    ),
-                    hovertemplate=f"{x_axis}=%{{x}}<br>{y_axis}=%{{y}}<extra>confirmed</extra>"
+                    marker=dict(size=5.2, color="rgba(0,0,0,0)", line=dict(width=1.4, color="red")),
+                    hovertemplate=f"{x_axis}=%{{x}}<br>{y_axis}=%{{y}}<extra>confirmed</extra>",
                 )
-                traces.append(trace_ring)
-
-            fig2d = go.Figure(data=traces)
-            fig2d.update_layout(
-                template="plotly_dark",
-                title=f"{x_axis} vs {y_axis}",
-                margin=dict(l=40, r=20, t=40, b=40),
-                uirevision="keep"
             )
-            config2d = dict(
-                displaylogo=False,
-                scrollZoom=True,
-                doubleClick="reset",
-                modeBarButtonsToAdd=["toggleSpikelines", "hovercompare", "v1hovermode"]
-            )
-            st.plotly_chart(fig2d, use_container_width=True, config=config2d, theme=None)
 
-        # 3D Scatter — improved exploration
-        st.subheader("3D Scatter Plot")
-        if len(numeric_cols) >= 3:
-            x3d = st.selectbox("3D X-axis", numeric_cols, index=0, key="x3d")
-            y3d = st.selectbox("3D Y-axis", numeric_cols, index=1 if len(numeric_cols) > 1 else 0, key="y3d")
-            z3d = st.selectbox("3D Z-axis", numeric_cols, index=2 if len(numeric_cols) > 2 else 0, key="z3d")
+        fig2d = go.Figure(data=traces)
+        fig2d.update_layout(
+            template="plotly_dark",
+            title=f"{x_axis} vs {y_axis}",
+            margin=dict(l=40, r=20, t=40, b=40),
+            height=520,
+            plot_bgcolor="#0f172a",
+            paper_bgcolor="#0e1117",
+            font=dict(color="#e5e7eb"),
+        )
+        if lock_2d_equal:
+            fig2d.update_layout(xaxis=dict(scaleanchor="y", scaleratio=1))
+        config2d = dict(displaylogo=False, scrollZoom=True, doubleClick="reset",
+                        modeBarButtonsToAdd=["toggleSpikelines", "hovercompare", "v1hovermode"])
+        st.plotly_chart(fig2d, use_container_width=True, config=config2d)
+        st.caption("Legend: white < 0.25 · Blues 0.25–0.75 · dark blue ≥ 0.75 · red ring = confirmed.")
 
-            st.markdown(f"""
-            **3D Axis Explanation:**  
-            - **X-axis ({x3d})** — {explain_axis(x3d)}  
-            - **Y-axis ({y3d})** — {explain_axis(y3d)}  
-            - **Z-axis ({z3d})** — {explain_axis(z3d)}  
-            - **Color Rules:**  
-              - Not exoplanet: **white** (confidence &lt; {LOW_THR})  
-              - Candidate: **Blues gradient** (confidence in [{LOW_THR}, {HIGH_THR}))  
-              - Exoplanet (model): **solid dark blue** (confidence ≥ {HIGH_THR})  
-              - Confirmed: **red ring overlay**
-            """)
+        # -------------------- 3D scatter (scaling options) --------------------
+        def minmax(series: pd.Series) -> pd.Series:
+            vmin, vmax = series.min(), series.max()
+            if pd.isna(vmin) or pd.isna(vmax) or vmax == vmin:
+                return pd.Series([0.5] * len(series), index=series.index)
+            return (series - vmin) / (vmax - vmin)
 
-            if has_conf:
-                conf = df["confidence_positive"]
-                mask_not3 = conf < LOW_THR
-                mask_cand3 = (conf >= LOW_THR) & (conf < HIGH_THR)
-                mask_plan3 = conf >= HIGH_THR
-            else:
-                mask_not3  = pd.Series([True] * len(df))
-                mask_cand3 = pd.Series([False] * len(df))
-                mask_plan3 = pd.Series([False] * len(df))
+        if scaling_mode == "Normalize to 0–1 (for selected axes)":
+            X3 = minmax(df_plot[x_axis]); Y3 = minmax(df_plot[y_axis]); Z3 = minmax(df_plot[z_axis])
+            scene_aspect = dict(aspectmode="cube")
+        else:
+            X3 = df_plot[x_axis]; Y3 = df_plot[y_axis]; Z3 = df_plot[z_axis]
+            scene_aspect = dict(aspectmode="cube" if scaling_mode.startswith("Equal") else "data")
+            scene_aspect = dict(aspectmode=scene_aspect["aspectmode"]) if isinstance(scene_aspect, dict) else dict(aspectmode=scene_aspect)
 
-            # Smaller 3D markers for dense clouds
-            trace_not3 = go.Scatter3d(
-                x=df.loc[mask_not3, x3d],
-                y=df.loc[mask_not3, y3d],
-                z=df.loc[mask_not3, z3d],
+        traces3 = [
+            go.Scatter3d(
+                x=X3[mask_not], y=Y3[mask_not], z=Z3[mask_not],
                 mode="markers",
                 name=f"Not exoplanet (< {LOW_THR:.2f})",
-                marker=dict(color="white", size=2.2, line=dict(width=0.3)),
-                hovertemplate=f"{x3d}=%{{x}}<br>{y3d}=%{{y}}<br>{z3d}=%{{z}}<extra></extra>"
+                marker=dict(color="white", size=2.0, line=dict(width=0.25)),
+                hovertemplate=f"{x_axis}=%{{x}}<br>{y_axis}=%{{y}}<br>{z_axis}=%{{z}}<extra></extra>",
             )
-            traces3 = [trace_not3]
-
-            if mask_cand3.any():
-                trace_cand3 = go.Scatter3d(
-                    x=df.loc[mask_cand3, x3d],
-                    y=df.loc[mask_cand3, y3d],
-                    z=df.loc[mask_cand3, z3d],
+        ]
+        if mask_cand.any():
+            traces3.append(
+                go.Scatter3d(
+                    x=X3[mask_cand], y=Y3[mask_cand], z=Z3[mask_cand],
                     mode="markers",
                     name=f"Candidate [{LOW_THR:.2f}, {HIGH_THR:.2f})",
                     marker=dict(
-                        size=2.4,
-                        color=df.loc[mask_cand3, "confidence_positive"],
+                        size=2.2,
+                        color=df_plot.loc[mask_cand, "confidence_positive"],
                         colorscale="Blues",
-                        cmin=LOW_THR, cmax=HIGH_THR,
-                        showscale=True,
+                        cmin=LOW_THR, cmax=HIGH_THR, showscale=True,
                         colorbar=dict(title="Confidence+"),
-                        line=dict(width=0.3)
+                        line=dict(width=0.25),
                     ),
-                    hovertemplate=f"{x3d}=%{{x}}<br>{y3d}=%{{y}}<br>{z3d}=%{{z}}<br>conf+=%{{marker.color:.2f}}<extra></extra>"
+                    hovertemplate=f"{x_axis}=%{{x}}<br>{y_axis}=%{{y}}<br>{z_axis}=%{{z}}<br>conf+=%{{marker.color:.2f}}<extra></extra>",
                 )
-                traces3.append(trace_cand3)
-
-            if mask_plan3.any():
-                trace_plan3 = go.Scatter3d(
-                    x=df.loc[mask_plan3, x3d],
-                    y=df.loc[mask_plan3, y3d],
-                    z=df.loc[mask_plan3, z3d],
+            )
+        if mask_plan.any():
+            traces3.append(
+                go.Scatter3d(
+                    x=X3[mask_plan], y=Y3[mask_plan], z=Z3[mask_plan],
                     mode="markers",
                     name=f"Exoplanet (≥ {HIGH_THR:.2f})",
-                    marker=dict(size=2.6, color="#1e3a8a", line=dict(width=0.4)),
-                    hovertemplate=f"{x3d}=%{{x}}<br>{y3d}=%{{y}}<br>{z3d}=%{{z}}<extra>exoplanet</extra>"
+                    marker=dict(size=2.4, color="#1e3a8a", line=dict(width=0.35)),
+                    hovertemplate=f"{x_axis}=%{{x}}<br>{y_axis}=%{{y}}<br>{z_axis}=%{{z}}<extra>exoplanet</extra>",
                 )
-                traces3.append(trace_plan3)
-
-            if mask_confirmed.any():
-                trace_ring3d = go.Scatter3d(
-                    x=df.loc[mask_confirmed, x3d],
-                    y=df.loc[mask_confirmed, y3d],
-                    z=df.loc[mask_confirmed, z3d],
+            )
+        if mask_confirmed.any():
+            traces3.append(
+                go.Scatter3d(
+                    x=X3[mask_confirmed], y=Y3[mask_confirmed], z=Z3[mask_confirmed],
                     mode="markers",
                     name="Confirmed (ring)",
-                    marker=dict(size=3.6, color="rgba(0,0,0,0)", line=dict(width=2, color="red")),
-                    hovertemplate=f"{x3d}=%{{x}}<br>{y3d}=%{{y}}<br>{z3d}=%{{z}}<extra>confirmed</extra>"
+                    marker=dict(size=3.2, color="rgba(0,0,0,0)", line=dict(width=1.6, color="red")),
+                    hovertemplate=f"{x_axis}=%{{x}}<br>{y_axis}=%{{y}}<br>{z_axis}=%{{z}}<extra>confirmed</extra>",
                 )
-                traces3.append(trace_ring3d)
-
-            fig3d = go.Figure(data=traces3)
-            fig3d.update_layout(
-                template="plotly_dark",
-                title=f"3D Visualization: {x3d}, {y3d}, {z3d}",
-                margin=dict(l=0, r=0, t=40, b=0),
-                scene=dict(
-                    xaxis=dict(title=x3d, showspikes=True, spikethickness=1),
-                    yaxis=dict(title=y3d, showspikes=True, spikethickness=1),
-                    zaxis=dict(title=z3d, showspikes=True, spikethickness=1),
-                    aspectmode="cube",
-                    dragmode="orbit",
-                    camera=dict(eye=dict(x=1.6, y=1.6, z=1.6))
-                ),
-                uirevision="keep"
             )
-            # Better exploration: scroll zoom, orbit tools, etc.
-            config3d = dict(
-                displaylogo=False,
-                scrollZoom=True,
-                doubleClick="reset",
-                toImageButtonOptions=dict(format="png", filename="exoplanet-3d"),
-                modeBarButtonsToAdd=[
-                    "resetCameraDefault3d",
-                    "resetCameraLastSave3d",
-                    "zoom3d",
-                    "pan3d",
-                    "orbitRotation",
-                    "tableRotation",
-                    "toggleSpikelines"
-                ]
-            )
-            st.plotly_chart(fig3d, use_container_width=True, config=config3d, theme=None, height=760)
 
-        st.subheader("Parameter Distributions")
-        if len(numeric_cols):
-            for col in numeric_cols:
-                st.write(f"#### Histogram of {col}")
-                st.markdown(f"Shows the distribution of {col.replace('_', ' ')} in the dataset.")
-                fig_hist = px.histogram(df, x=col, nbins=30, title=f"Distribution of {col}", template='plotly_dark')
-                fig_hist.update_traces(marker_line_width=0)  # cleaner bars
-                st.plotly_chart(fig_hist, use_container_width=True)
-        else:
-            st.info("Upload a CSV with numeric columns to see distributions.")
+        fig3d = go.Figure(data=traces3)
+        fig3d.update_layout(
+            template="plotly_dark",
+            title=f"3D: {x_axis}, {y_axis}, {z_axis}",
+            margin=dict(l=0, r=0, t=40, b=0),
+            scene=dict(
+                xaxis=dict(title=x_axis, showspikes=True, spikethickness=1, showbackground=True,
+                           backgroundcolor="rgba(30,41,59,0.5)", gridcolor="rgba(200,200,200,0.12)"),
+                yaxis=dict(title=y_axis, showspikes=True, spikethickness=1, showbackground=True,
+                           backgroundcolor="rgba(30,41,59,0.5)", gridcolor="rgba(200,200,200,0.12)"),
+                zaxis=dict(title=z_axis, showspikes=True, spikethickness=1, showbackground=True,
+                           backgroundcolor="rgba(30,41,59,0.5)", gridcolor="rgba(200,200,200,0.12)"),
+                **scene_aspect,
+                dragmode="orbit",
+                camera=dict(eye=dict(x=1.8, y=1.8, z=1.8)),
+            ),
+            uirevision="keep",
+            height=860,
+            paper_bgcolor="#0e1117",
+            font=dict(color="#e5e7eb"),
+        )
+        config3d = dict(
+            displaylogo=False,
+            scrollZoom=True,
+            doubleClick="reset",
+            toImageButtonOptions=dict(format="png", filename="exoplanet-3d"),
+            modeBarButtonsToAdd=[
+                "resetCameraDefault3d","resetCameraLastSave3d",
+                "zoom3d","pan3d","orbitRotation","tableRotation","toggleSpikelines",
+            ],
+        )
+        st.plotly_chart(fig3d, use_container_width=True, config=config3d)
+        st.caption(
+            "3D scaling: "
+            + ("Equal cube" if scaling_mode.startswith("Equal") else ("Data-driven" if "Data" in scaling_mode else "Normalized 0–1"))
+            + ". Tip: drag to orbit, scroll to zoom, double-click to reset."
+        )
+
+        # ---------- Compact distributions ----------
+        st.markdown("<h3>Distributions</h3>", unsafe_allow_html=True)
+        cA, cB, cC = st.columns([1, 1, 1])
+
+        with cA:
+            fig_x = px.histogram(df_plot, x=x_axis, nbins=30, title=f"Distribution: {x_axis}", template="plotly_dark")
+            fig_x.update_layout(height=280, paper_bgcolor="#0e1117", plot_bgcolor="#0f172a", font_color="#e5e7eb")
+            fig_x.update_traces(marker_line_width=0)
+            st.plotly_chart(fig_x, use_container_width=True, config=dict(displaylogo=False))
+
+        with cB:
+            fig_y = px.histogram(df_plot, x=y_axis, nbins=30, title=f"Distribution: {y_axis}", template="plotly_dark")
+            fig_y.update_layout(height=280, paper_bgcolor="#0e1117", plot_bgcolor="#0f172a", font_color="#e5e7eb")
+            fig_y.update_traces(marker_line_width=0)
+            st.plotly_chart(fig_y, use_container_width=True, config=dict(displaylogo=False))
+
+        with cC:
+            actual_confirmed = base_confirmed.loc[df_plot.index].sum()
+            actual_other = len(df_plot) - actual_confirmed
+            if "confidence_positive" in df_plot.columns and pd.api.types.is_numeric_dtype(df_plot["confidence_positive"]):
+                pred_exo = int((df_plot["confidence_positive"] >= 0.75).sum())
+                pred_other = len(df_plot) - pred_exo
+            else:
+                pred_exo, pred_other = 0, len(df_plot)
+
+            bar_df = pd.DataFrame({
+                "category": ["Actual Confirmed", "Actual Not", "Pred Exoplanet", "Pred Not"],
+                "count":    [actual_confirmed,   actual_other,  pred_exo,        pred_other]
+            })
+            fig_bar = px.bar(bar_df, x="category", y="count", title="Predicted vs Actual (counts)", template="plotly_dark")
+            fig_bar.update_layout(height=280, paper_bgcolor="#0e1117", plot_bgcolor="#0f172a",
+                                  font_color="#e5e7eb", xaxis_title="", yaxis_title="")
+            st.plotly_chart(fig_bar, use_container_width=True, config=dict(displaylogo=False))
 
 with tab4:
-    st.title("Model Performance")
-    st.markdown("""
-    **Coming Soon:**  
-    This section will display results & predictions of the machine learning model compared to actual exoplanet classifications.
-    """)
+    st.markdown(
+        "<div class='dark-card'><h2 style='margin:.25rem 0'>Model Performance</h2>"
+        "<p>Coming soon: metrics, ROC, precision/recall, and per-run comparisons.</p></div>",
+        unsafe_allow_html=True,
+    )
 
+# ---------- Compare Model (embed HTML) ----------
 with tab5:
-    st.title("Compare Model vs Actual Data (HTML)")
-    st.markdown("""
-    The embedded page shows side-by-side comparison with the same rules:
-    **white** (&lt; 0.25), **Blues gradient** (0.25–0.75), **dark blue** (≥ 0.75), and **red ring** for confirmed.
-    You can also pop either plot **full screen** for deeper inspection.
-    """)
+    st.markdown("<h2>Compare Model vs Actual Data (HTML)</h2>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='dark-card tight' style='margin-bottom:12px'>"
+        "Upload and explore in the embedded viewer. It uses the same color rules and also supports percentile trimming."
+        "</div>",
+        unsafe_allow_html=True,
+    )
     try:
         with open(APP_DIR / "comparison.html", "r", encoding="utf-8") as f:
             html_content = f.read()
