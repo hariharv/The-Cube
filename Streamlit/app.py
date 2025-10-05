@@ -14,7 +14,11 @@ with st.sidebar:
 tab1, tab2, tab3, tab4 = st.tabs(["About Us", "Project Information", "Visualization", "Model Performance"])
 
 with tab1:
-    st.image("cube_logo.png", width=120)
+    LOGO_PATH = Path(__file__).parent / "cube_logo.png"
+    if LOGO_PATH.exists():
+        st.image(str(LOGO_PATH), use_column_width=True)
+    else:
+        st.warning(f"Logo not found at: {LOGO_PATH}")    
     st.title("About Us")
     st.markdown("""
     **The Cube**  
