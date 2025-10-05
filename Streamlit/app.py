@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from pathlib import Path
 
 # NASA SpaceApps UI: Add cube logo to sidebar and top of each tab
 st.set_page_config(page_title="Exoplanet Data Visualizer", layout="wide")
