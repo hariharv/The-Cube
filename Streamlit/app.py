@@ -1,15 +1,11 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import base64
-from datetime import datetime
-from pathlib import Path
-
 from pathlib import Path
 import json
-import pandas as pd
-import plotly.express as px
-import streamlit as st
+import streamlit.components.v1 as components
 
 # Repo-aware paths (app is inside /Streamlit)
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -29,15 +25,11 @@ def load_predictions(run_dir: Path) -> pd.DataFrame:
     path = run_dir / "predictions.jsonl"
     if not path.exists():
         return pd.DataFrame()
-    # read jsonl
     records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     if not records:
         return pd.DataFrame()
-    # normalize features into columns
     df = pd.json_normalize(records, sep=".")
-    # nicer column names: features.period_days -> period_days
     df.columns = [c.replace("features.", "") for c in df.columns]
-    # ensure essential columns exist
     for col in ["id", "score", "label_pred", "label_true", "candidate_name", "timestamp"]:
         if col not in df.columns:
             df[col] = None
@@ -51,10 +43,10 @@ def load_metrics(run_dir: Path) -> dict:
 
 # ---- Define paths early ----
 APP_DIR = Path(__file__).resolve().parent
-LOGO_PATH = APP_DIR / "cube_logo.png"  # adjust if inside /assets
-background_path = Path(__file__).parent / "stars_bg.png"  # or .gif
+LOGO_PATH = APP_DIR / "cube_logo.png"
+background_path = Path(__file__).parent / "stars_bg.png"
 
-# --- Inject starry background ---
+# --- Inject starry background (fallback to radial gradient) ---
 if background_path.exists():
     st.markdown(
         f"""
@@ -82,142 +74,115 @@ else:
         """,
         unsafe_allow_html=True
     )
-# Page config
+
 st.set_page_config(page_title="Exoplanet Data Visualizer", layout="wide")
 
-# ---- App-wide dark theme + starfield-inspired background (CSS) ----
+# ---- Global CSS (dark, starfield look) ----
 _CSS = r"""
 <style>
-/* Page base: solid black canvas */
-html, body, .stApp {
-    background: #000000;
-    color: #e6e6e6;
-}
-
-/* Dense starfield using multiple tiny radial gradients and a repeating pattern */
+html, body, .stApp { background: #000; color: #e6e6e6; }
 .stApp:before {
-    content: "";
-    position: fixed;
-    left: 0; top: 0; right: 0; bottom: 0;
-    background-color: #000;
-    z-index: -1;
-        background-image:
-            radial-gradient(circle at 3% 10%, rgba(255,255,255,0.95) 1px, transparent 2px),
-            radial-gradient(circle at 12% 30%, rgba(255,255,255,0.9) 1px, transparent 2px),
-            radial-gradient(circle at 20% 60%, rgba(255,255,255,0.85) 1px, transparent 2px),
-            radial-gradient(circle at 30% 15%, rgba(255,255,255,0.9) 1px, transparent 2px),
-            radial-gradient(circle at 40% 50%, rgba(255,255,255,0.8) 1px, transparent 2px),
-            radial-gradient(circle at 50% 80%, rgba(255,255,255,0.75) 1px, transparent 2px),
-            radial-gradient(circle at 60% 35%, rgba(255,255,255,0.7) 1px, transparent 2px),
-            radial-gradient(circle at 68% 10%, rgba(255,255,255,0.6) 1px, transparent 2px),
-            radial-gradient(circle at 78% 55%, rgba(255,255,255,0.65) 1px, transparent 2px),
-            radial-gradient(circle at 85% 25%, rgba(255,255,255,0.5) 1px, transparent 2px),
-            radial-gradient(circle at 92% 70%, rgba(255,255,255,0.45) 1px, transparent 2px);
-    background-repeat: repeat;
-    opacity: 0.95;
-    filter: blur(0.2px);
+    content: ""; position: fixed; left:0; top:0; right:0; bottom:0; z-index:-1;
+    background-image:
+        radial-gradient(circle at 3% 10%, rgba(255,255,255,0.95) 1px, transparent 2px),
+        radial-gradient(circle at 12% 30%, rgba(255,255,255,0.9) 1px, transparent 2px),
+        radial-gradient(circle at 20% 60%, rgba(255,255,255,0.85) 1px, transparent 2px),
+        radial-gradient(circle at 30% 15%, rgba(255,255,255,0.9) 1px, transparent 2px),
+        radial-gradient(circle at 40% 50%, rgba(255,255,255,0.8) 1px, transparent 2px),
+        radial-gradient(circle at 50% 80%, rgba(255,255,255,0.75) 1px, transparent 2px),
+        radial-gradient(circle at 60% 35%, rgba(255,255,255,0.7) 1px, transparent 2px),
+        radial-gradient(circle at 68% 10%, rgba(255,255,255,0.6) 1px, transparent 2px),
+        radial-gradient(circle at 78% 55%, rgba(255,255,255,0.65) 1px, transparent 2px),
+        radial-gradient(circle at 85% 25%, rgba(255,255,255,0.5) 1px, transparent 2px),
+        radial-gradient(circle at 92% 70%, rgba(255,255,255,0.45) 1px, transparent 2px);
+    background-repeat: repeat; opacity:0.95; filter: blur(0.2px);
+    animation: twinkle 10s ease-in-out infinite;
 }
-
-/* Subtle twinkle animation (affects opacity of the star layer) */
-@keyframes twinkle {
-    0% {opacity: 0.9}
-    50% {opacity: 1}
-    100% {opacity: 0.9}
-}
-.stApp:before { animation: twinkle 10s ease-in-out infinite; }
-
-/* Streamlit container tweaks */
-.css-1d391kg, .main, .block-container {
-    max-width: 100% !important;
-    padding-left: 2rem !important;
-    padding-right: 2rem !important;
-}
-
-/* Sidebar styling */
-.stSidebar {
-    background: linear-gradient(180deg, rgba(10,10,10,0.9), rgba(6,6,6,0.9));
-    color: #ddd;
-}
-
-/* Hide the Streamlit header/menu for a cleaner look */
-header, footer, #MainMenu {
-    visibility: hidden;
-}
-
-/* Make titles pop */
-h1, h2, h3, .streamlit-expanderHeader {
-    color: #f5f5f5;
-}
-
-/* Button style */
-.stButton>button {
-    background: linear-gradient(90deg,#333 0%, #111 100%);
-    color: #fff;
-    border: 1px solid rgba(255,255,255,0.06);
-}
-
-/* Fixed cube logo in top-left (will be injected as an <img id="cube-logo">) */
-#cube-logo {
-    position: fixed;
-    left: 14px;
-    top: 12px;
-    width: 56px; /* smaller/tiny cube */
-    height: auto;
-    z-index: 9999;
-    border-radius: 6px;
-    box-shadow: 0 6px 24px rgba(0,0,0,0.75);
-}
-
+@keyframes twinkle { 0%{opacity:0.9} 50%{opacity:1} 100%{opacity:0.9} }
+#cube-logo { position: fixed; left: 14px; top: 12px; width: 56px; z-index: 9999; border-radius: 6px;
+             box-shadow: 0 6px 24px rgba(0,0,0,0.75); }
+header, footer, #MainMenu { visibility: hidden; }
 </style>
 """
-# ---- Paths & helpers (define ONCE and reuse) ----
-APP_DIR = Path(__file__).resolve().parent
-LOGO_PATH = APP_DIR / "cube_logo.png"   # change to (APP_DIR / "assets" / "cube_logo.png") if you move it
-
-# Prefer loading from an external CSS file for easier tweaks
 css_file = APP_DIR / "static" / "styles.css"
 if css_file.is_file():
-    # Wrap file contents in a <style> tag so it's interpreted as CSS, not rendered as text
     st.markdown(f"<style>{css_file.read_text()}</style>", unsafe_allow_html=True)
 else:
     st.markdown(_CSS, unsafe_allow_html=True)
 
-def show_logo(*, width=None, use_container_width=False):
-    """Deprecated helper kept for compatibility (we render a fixed logo instead)."""
-    # intentionally no-op; the app now renders a single fixed-position cube logo
-    return
+# ----------------------------- #
+# Axis explanations
+# ----------------------------- #
+AXIS_INFO = {
+    "koi_period": "Orbital period — days per full orbit around the host star.",
+    "koi_duration": "Transit duration — hours the planet takes to cross the star.",
+    "koi_depth": "Transit depth — fractional drop in brightness during transit.",
+    "koi_prad": "Planet radius — in Earth radii (R⊕).",
+    "koi_teq": "Equilibrium temperature — blackbody estimate in Kelvin.",
+    "koi_insol": "Incident flux — stellar energy received vs. Earth (S⊕).",
+    "koi_steff": "Stellar effective temperature — surface temperature (K).",
+    "koi_srad": "Stellar radius — in solar radii (R☉).",
+    "koi_slogg": "Stellar surface gravity — log(g) in cgs units.",
+    "koi_smet": "Stellar metallicity — [Fe/H] dex.",
 
+    "period": "Orbital period — time to orbit the star once (days).",
+    "period_days": "Orbital period — time to orbit the star once (days).",
+    "duration": "Transit duration — transit length (hours).",
+    "duration_hrs": "Transit duration — transit length (hours).",
+    "depth_ppm": "Transit depth — brightness drop in parts-per-million.",
+    "rp_re": "Planet radius — Earth radii (R⊕).",
+    "teq": "Equilibrium temperature — blackbody estimate in Kelvin.",
+    "teq_k": "Equilibrium temperature — Kelvin.",
+    "srad": "Stellar radius — solar radii (R☉).",
+    "teff": "Stellar effective temperature — surface temperature (K).",
+    "insol": "Incident flux — relative to Earth (S⊕).",
+    "semi_major_axis": "Orbital semi-major axis — average star–planet distance (AU).",
+    "eccentricity": "Orbital eccentricity — deviation from a circular orbit.",
+    "impact_param": "Impact parameter — transit chord across the stellar disk.",
+    "snr": "Signal-to-noise ratio — detection strength.",
 
+    "class": "Predicted/true class label — e.g., confirmed, candidate, or false_positive.",
+    "trandur": "Transit duration — transit length (hours).",
+    "rade": "Planet radius — in Earth radii (R⊕).",
+    "earthflux": "Incident stellar flux received by the planet relative to Earth (S⊕).",
+    "eqtemp": "Equilibrium temperature — estimated blackbody temperature (K).",
+    "efftemp": "Stellar effective temperature — surface temperature of the host star (K).",
+    "rads": "Stellar radius — in solar radii (R☉).",
+}
+
+def explain_axis(name: str) -> str:
+    if not isinstance(name, str):
+        return "Feature description unavailable."
+    key = name.strip()
+    return AXIS_INFO.get(key, AXIS_INFO.get(key.lower(), f"{name.replace('_', ' ').capitalize()} — feature description unavailable."))
+
+# Sidebar
 with st.sidebar:
     st.markdown("# The Cube")
     st.markdown("### NASA SpaceApps Challenge")
     st.markdown("---")
 
-# Hero / header area inspired by a dark, minimal gallery
+# Hero
 with st.container():
     left, right = st.columns([3,1])
     with left:
         st.markdown("# <span style='font-size:44px;color:#ffffff'>Exoplanet Data Visualizer</span>", unsafe_allow_html=True)
         st.markdown("<p style='color:#cfcfcf; font-size:18px'>Explore candidate exoplanets with dark, immersive visuals — curated plots, 3D views, and model performance overlays.</p>", unsafe_allow_html=True)
         st.markdown("<div style='margin-top:12px'><em style='color:#9a9a9a'>Tip:</em> upload a CSV in the Visualization tab to begin.</div>", unsafe_allow_html=True)
-        # ...existing hero content...
     with right:
-        # we'll keep the header clean; the cube logo is fixed to the top-left corner
         pass
 
-# Inject the cube logo as an inline base64 image so it's always available and fixed on top-left
+# Fixed cube logo
 if LOGO_PATH.is_file():
     try:
         with open(LOGO_PATH, 'rb') as f:
             b64 = base64.b64encode(f.read()).decode('utf-8')
-        img_html = f"<img id=\"cube-logo\" src=\"data:image/png;base64,{b64}\" alt=\"cube\" />"
-        st.markdown(img_html, unsafe_allow_html=True)
+        st.markdown(f"<img id='cube-logo' src='data:image/png;base64,{b64}' alt='cube'/>", unsafe_allow_html=True)
     except Exception:
-        # if embedding fails, fall back to a normal image render inside the sidebar area
         st.sidebar.image(str(LOGO_PATH), width=80)
 
-
-tab1, tab2, tab3, tab4 = st.tabs(["About Us", "Project Information", "Visualization", "Model Performance"])
+# Tabs (added "Compare Model")
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["About Us", "Project Information", "Visualization", "Model Performance", "Compare Model"])
 
 with tab1:
     st.title("About Us")
@@ -244,9 +209,12 @@ with tab2:
     - Model performance tab (for future ML integration)
     """)
 
+# ----------------------------- #
+# Visualization (three-band rules + red ring)
+# ----------------------------- #
 with tab3:
     st.title("Data Visualization")
-    st.markdown("Upload a NASA Exoplanet Archive CSV and explore trends in actual exoplanets.")
+    st.markdown("Upload a NASA Exoplanet Archive CSV or your model output CSV (e.g. `predicted.csv`).")
 
     uploaded_file = st.file_uploader("Upload CSV file", type=["csv"]) 
 
@@ -255,104 +223,268 @@ with tab3:
 
         numeric_cols = df.select_dtypes(include='number').columns.tolist()
         all_cols = df.columns.tolist()
+        object_cols = [c for c in all_cols if df[c].dtype == 'object']
 
         st.write("### "+uploaded_file.name+" Data", df.head())
 
-        # Identify disposition column for confirmed exoplanets
-        disposition_col = None
-        for col in all_cols:
-            if col.lower() in ['koi_disposition', 'disposition']:
-                disposition_col = col
-                break
+        # Label/Disposition column detection
+        lower_map = {c.lower(): c for c in all_cols}
+        preferred_order = ["predicted_label", "actual_label", "koi_disposition", "disposition", "class", "label", "status"]
+        default_label_col = next((lower_map[name] for name in preferred_order if name in lower_map), None)
+        small_num_cols = [c for c in all_cols if pd.api.types.is_numeric_dtype(df[c]) and df[c].nunique() <= 10]
+        label_candidates = list(dict.fromkeys(([default_label_col] if default_label_col else []) + object_cols + small_num_cols))
+        label_candidates = [c for c in label_candidates if c is not None]
+        label_col = st.selectbox("Label/Disposition column", options=label_candidates) if label_candidates else None
 
-        st.subheader("2D Scatter Plot")
-        x_axis = st.selectbox("X-axis", numeric_cols, index=0 if 'period' in numeric_cols else 0, help="Select the feature for the X-axis (e.g., orbital period, planet radius, etc.)")
-        y_axis = st.selectbox("Y-axis", numeric_cols, index=1 if 'radE' in numeric_cols else 1, help="Select the feature for the Y-axis (e.g., planet radius, equilibrium temperature, etc.)")
-        color_col_candidates = [c for c in all_cols if df[c].nunique() < 20 and df[c].dtype == 'object']
-        color_col = st.selectbox("Color by", color_col_candidates, index=0 if color_col_candidates else None, help="Categorical feature to color the points (e.g., disposition)")
-
-        st.markdown(f"""
-        **Axis Explanation:**  
-        - **{x_axis}:** {x_axis.replace('_', ' ').capitalize()}  
-        - **{y_axis}:** {y_axis.replace('_', ' ').capitalize()}  
-        - **Relationship:**  
-            This plot shows how {y_axis.replace('_', ' ')} varies with {x_axis.replace('_', ' ')}. Patterns may reveal correlations, clusters, or outliers among exoplanets.
-        """)
-
-        # Highlight confirmed exoplanets in red if possible
-        if disposition_col and color_col == disposition_col:
-            color_map = {v: 'red' if str(v).lower() == 'confirmed' else '#1f77b4' for v in df[disposition_col].unique()}
-            fig2d = px.scatter(
-                df,
-                x=x_axis,
-                y=y_axis,
-                color=disposition_col,
-                color_discrete_map=color_map,
-                labels={x_axis: x_axis, y_axis: y_axis, disposition_col: disposition_col},
-                title=f"{x_axis} vs {y_axis}",
-                template='plotly_dark'
-            )
+        # Confirmed mask (string contains 'confirm' or numeric equals chosen 'confirmed value')
+        if label_col is not None and pd.api.types.is_numeric_dtype(df[label_col]):
+            uniq = sorted(pd.Series(df[label_col].dropna().unique()).tolist())
+            default_idx = uniq.index(1) if 1 in uniq else 0
+            confirm_value = st.selectbox("Which numeric value means 'confirmed'?", options=uniq, index=default_idx, help="Used to draw the red ring around confirmed exoplanets.")
+            mask_confirmed = (df[label_col] == confirm_value)
+        elif label_col is not None:
+            mask_confirmed = df[label_col].astype(str).str.lower().str.contains("confirm")
         else:
-            fig2d = px.scatter(
-                df,
-                x=x_axis,
-                y=y_axis,
-                color=color_col if color_col_candidates else None,
-                labels={x_axis: x_axis, y_axis: y_axis, color_col: color_col},
-                title=f"{x_axis} vs {y_axis}",
-                template='plotly_dark'
-            )
-        st.plotly_chart(fig2d, use_container_width=True)
+            mask_confirmed = pd.Series([False] * len(df))
 
-        st.subheader("3D Scatter Plot")
-        if len(numeric_cols) >= 3:
-            x3d = st.selectbox("3D X-axis", numeric_cols, index=0, key="x3d", help="Select the feature for the X-axis in 3D plot")
-            y3d = st.selectbox("3D Y-axis", numeric_cols, index=1, key="y3d", help="Select the feature for the Y-axis in 3D plot")
-            z3d = st.selectbox("3D Z-axis", numeric_cols, index=2, key="z3d", help="Select the feature for the Z-axis in 3D plot")
-            color3d_candidates = [c for c in all_cols if df[c].nunique() < 20 and df[c].dtype == 'object']
-            color3d = st.selectbox("3D Color by", color3d_candidates, index=0 if color3d_candidates else None, key="color3d", help="Categorical feature to color the points in 3D plot")
+        # Confidence column + fixed thresholds for three bands
+        has_conf = ("confidence_positive" in df.columns) and pd.api.types.is_numeric_dtype(df["confidence_positive"])
+        LOW_THR, HIGH_THR = 0.25, 0.75
+        st.markdown(f"**Banding:** not exoplanet: < {LOW_THR}, candidate: [{LOW_THR}, {HIGH_THR}), exoplanet: ≥ {HIGH_THR}")
+
+        # 2D Scatter
+        st.subheader("2D Scatter Plot")
+        if len(numeric_cols) == 0:
+            st.warning("No numeric columns found.")
+        else:
+            x_axis = st.selectbox("X-axis", numeric_cols, index=0 if 'period' in numeric_cols else 0, help="Select numeric feature for X-axis")
+            y_axis = st.selectbox("Y-axis", numeric_cols, index=1 if len(numeric_cols) > 1 else 0, help="Select numeric feature for Y-axis")
 
             st.markdown(f"""
             **Axis Explanation:**  
-            - **{x3d}:** {x3d.replace('_', ' ').capitalize()}  
-            - **{y3d}:** {y3d.replace('_', ' ').capitalize()}  
-            - **{z3d}:** {z3d.replace('_', ' ').capitalize()}  
-            - **Relationship:**  
-                This 3D plot visualizes the interaction between {x3d.replace('_', ' ')}, {y3d.replace('_', ' ')}, and {z3d.replace('_', ' ')}. It helps uncover multi-dimensional patterns in exoplanet properties.
+            - **X-axis ({x_axis})** — {explain_axis(x_axis)}  
+            - **Y-axis ({y_axis})** — {explain_axis(y_axis)}  
+            - **Color Rules:**  
+              - Not exoplanet: **white** (confidence &lt; {LOW_THR})  
+              - Candidate: **Blues gradient** (confidence in [{LOW_THR}, {HIGH_THR}))  
+              - Exoplanet (model): **solid dark blue** (confidence ≥ {HIGH_THR})  
+              - Confirmed: **red ring overlay**
             """)
 
-            if disposition_col and color3d == disposition_col:
-                color_map_3d = {v: 'red' if str(v).lower() == 'confirmed' else '#1f77b4' for v in df[disposition_col].unique()}
-                fig3d = px.scatter_3d(
-                    df,
-                    x=x3d,
-                    y=y3d,
-                    z=z3d,
-                    color=disposition_col,
-                    color_discrete_map=color_map_3d,
-                    labels={x3d: x3d, y3d: y3d, z3d: z3d, disposition_col: disposition_col},
-                    title=f"3D Visualization: {x3d}, {y3d}, {z3d}",
-                    template='plotly_dark'
-                )
+            if has_conf:
+                conf = df["confidence_positive"]
+                mask_not   = conf < LOW_THR
+                mask_cand  = (conf >= LOW_THR) & (conf < HIGH_THR)
+                mask_plan  = conf >= HIGH_THR
             else:
-                fig3d = px.scatter_3d(
-                    df,
-                    x=x3d,
-                    y=y3d,
-                    z=z3d,
-                    color=color3d if color3d_candidates else None,
-                    labels={x3d: x3d, y3d: y3d, z3d: z3d, color3d: color3d},
-                    title=f"3D Visualization: {x3d}, {y3d}, {z3d}",
-                    template='plotly_dark'
+                mask_not  = pd.Series([True] * len(df))
+                mask_cand = pd.Series([False] * len(df))
+                mask_plan = pd.Series([False] * len(df))
+
+            # Smaller dots (2D)
+            trace_not = go.Scatter(
+                x=df.loc[mask_not, x_axis],
+                y=df.loc[mask_not, y_axis],
+                mode="markers",
+                name=f"Not exoplanet (< {LOW_THR:.2f})",
+                marker=dict(color="white", size=3.5, line=dict(width=0.3, color="rgba(0,0,0,0.3)")),
+                hovertemplate=f"{x_axis}=%{{x}}<br>{y_axis}=%{{y}}<extra></extra>"
+            )
+            traces = [trace_not]
+
+            if mask_cand.any():
+                trace_cand = go.Scatter(
+                    x=df.loc[mask_cand, x_axis],
+                    y=df.loc[mask_cand, y_axis],
+                    mode="markers",
+                    name=f"Candidate [{LOW_THR:.2f}, {HIGH_THR:.2f})",
+                    marker=dict(
+                        size=3.5,
+                        color=df.loc[mask_cand, "confidence_positive"],
+                        colorscale="Blues",
+                        cmin=LOW_THR, cmax=HIGH_THR,
+                        showscale=True,
+                        colorbar=dict(title="Confidence+"),
+                        line=dict(width=0.3, color="rgba(255,255,255,0.6)")
+                    ),
+                    hovertemplate=f"{x_axis}=%{{x}}<br>{y_axis}=%{{y}}<br>conf+=%{{marker.color:.2f}}<extra></extra>"
                 )
-            st.plotly_chart(fig3d, use_container_width=True)
+                traces.append(trace_cand)
+
+            if mask_plan.any():
+                trace_plan = go.Scatter(
+                    x=df.loc[mask_plan, x_axis],
+                    y=df.loc[mask_plan, y_axis],
+                    mode="markers",
+                    name=f"Exoplanet (≥ {HIGH_THR:.2f})",
+                    marker=dict(
+                        size=3.5,
+                        color="#1e3a8a",
+                        line=dict(width=0.3, color="rgba(255,255,255,0.6)")
+                    ),
+                    hovertemplate=f"{x_axis}=%{{x}}<br>{y_axis}=%{{y}}<extra>exoplanet</extra>"
+                )
+                traces.append(trace_plan)
+
+            # Confirmed ring overlay (RED ring) — slightly larger but still subtle
+            if mask_confirmed.any():
+                trace_ring = go.Scatter(
+                    x=df.loc[mask_confirmed, x_axis],
+                    y=df.loc[mask_confirmed, y_axis],
+                    mode="markers",
+                    name="Confirmed (ring)",
+                    marker=dict(
+                        size=6,
+                        color="rgba(0,0,0,0)",
+                        line=dict(width=1.5, color="red")
+                    ),
+                    hovertemplate=f"{x_axis}=%{{x}}<br>{y_axis}=%{{y}}<extra>confirmed</extra>"
+                )
+                traces.append(trace_ring)
+
+            fig2d = go.Figure(data=traces)
+            fig2d.update_layout(
+                template="plotly_dark",
+                title=f"{x_axis} vs {y_axis}",
+                margin=dict(l=40, r=20, t=40, b=40),
+                uirevision="keep"
+            )
+            config2d = dict(
+                displaylogo=False,
+                scrollZoom=True,
+                doubleClick="reset",
+                modeBarButtonsToAdd=["toggleSpikelines", "hovercompare", "v1hovermode"]
+            )
+            st.plotly_chart(fig2d, use_container_width=True, config=config2d, theme=None)
+
+        # 3D Scatter — improved exploration
+        st.subheader("3D Scatter Plot")
+        if len(numeric_cols) >= 3:
+            x3d = st.selectbox("3D X-axis", numeric_cols, index=0, key="x3d")
+            y3d = st.selectbox("3D Y-axis", numeric_cols, index=1 if len(numeric_cols) > 1 else 0, key="y3d")
+            z3d = st.selectbox("3D Z-axis", numeric_cols, index=2 if len(numeric_cols) > 2 else 0, key="z3d")
+
+            st.markdown(f"""
+            **3D Axis Explanation:**  
+            - **X-axis ({x3d})** — {explain_axis(x3d)}  
+            - **Y-axis ({y3d})** — {explain_axis(y3d)}  
+            - **Z-axis ({z3d})** — {explain_axis(z3d)}  
+            - **Color Rules:**  
+              - Not exoplanet: **white** (confidence &lt; {LOW_THR})  
+              - Candidate: **Blues gradient** (confidence in [{LOW_THR}, {HIGH_THR}))  
+              - Exoplanet (model): **solid dark blue** (confidence ≥ {HIGH_THR})  
+              - Confirmed: **red ring overlay**
+            """)
+
+            if has_conf:
+                conf = df["confidence_positive"]
+                mask_not3 = conf < LOW_THR
+                mask_cand3 = (conf >= LOW_THR) & (conf < HIGH_THR)
+                mask_plan3 = conf >= HIGH_THR
+            else:
+                mask_not3  = pd.Series([True] * len(df))
+                mask_cand3 = pd.Series([False] * len(df))
+                mask_plan3 = pd.Series([False] * len(df))
+
+            # Smaller 3D markers for dense clouds
+            trace_not3 = go.Scatter3d(
+                x=df.loc[mask_not3, x3d],
+                y=df.loc[mask_not3, y3d],
+                z=df.loc[mask_not3, z3d],
+                mode="markers",
+                name=f"Not exoplanet (< {LOW_THR:.2f})",
+                marker=dict(color="white", size=2.2, line=dict(width=0.3)),
+                hovertemplate=f"{x3d}=%{{x}}<br>{y3d}=%{{y}}<br>{z3d}=%{{z}}<extra></extra>"
+            )
+            traces3 = [trace_not3]
+
+            if mask_cand3.any():
+                trace_cand3 = go.Scatter3d(
+                    x=df.loc[mask_cand3, x3d],
+                    y=df.loc[mask_cand3, y3d],
+                    z=df.loc[mask_cand3, z3d],
+                    mode="markers",
+                    name=f"Candidate [{LOW_THR:.2f}, {HIGH_THR:.2f})",
+                    marker=dict(
+                        size=2.4,
+                        color=df.loc[mask_cand3, "confidence_positive"],
+                        colorscale="Blues",
+                        cmin=LOW_THR, cmax=HIGH_THR,
+                        showscale=True,
+                        colorbar=dict(title="Confidence+"),
+                        line=dict(width=0.3)
+                    ),
+                    hovertemplate=f"{x3d}=%{{x}}<br>{y3d}=%{{y}}<br>{z3d}=%{{z}}<br>conf+=%{{marker.color:.2f}}<extra></extra>"
+                )
+                traces3.append(trace_cand3)
+
+            if mask_plan3.any():
+                trace_plan3 = go.Scatter3d(
+                    x=df.loc[mask_plan3, x3d],
+                    y=df.loc[mask_plan3, y3d],
+                    z=df.loc[mask_plan3, z3d],
+                    mode="markers",
+                    name=f"Exoplanet (≥ {HIGH_THR:.2f})",
+                    marker=dict(size=2.6, color="#1e3a8a", line=dict(width=0.4)),
+                    hovertemplate=f"{x3d}=%{{x}}<br>{y3d}=%{{y}}<br>{z3d}=%{{z}}<extra>exoplanet</extra>"
+                )
+                traces3.append(trace_plan3)
+
+            if mask_confirmed.any():
+                trace_ring3d = go.Scatter3d(
+                    x=df.loc[mask_confirmed, x3d],
+                    y=df.loc[mask_confirmed, y3d],
+                    z=df.loc[mask_confirmed, z3d],
+                    mode="markers",
+                    name="Confirmed (ring)",
+                    marker=dict(size=3.6, color="rgba(0,0,0,0)", line=dict(width=2, color="red")),
+                    hovertemplate=f"{x3d}=%{{x}}<br>{y3d}=%{{y}}<br>{z3d}=%{{z}}<extra>confirmed</extra>"
+                )
+                traces3.append(trace_ring3d)
+
+            fig3d = go.Figure(data=traces3)
+            fig3d.update_layout(
+                template="plotly_dark",
+                title=f"3D Visualization: {x3d}, {y3d}, {z3d}",
+                margin=dict(l=0, r=0, t=40, b=0),
+                scene=dict(
+                    xaxis=dict(title=x3d, showspikes=True, spikethickness=1),
+                    yaxis=dict(title=y3d, showspikes=True, spikethickness=1),
+                    zaxis=dict(title=z3d, showspikes=True, spikethickness=1),
+                    aspectmode="cube",
+                    dragmode="orbit",
+                    camera=dict(eye=dict(x=1.6, y=1.6, z=1.6))
+                ),
+                uirevision="keep"
+            )
+            # Better exploration: scroll zoom, orbit tools, etc.
+            config3d = dict(
+                displaylogo=False,
+                scrollZoom=True,
+                doubleClick="reset",
+                toImageButtonOptions=dict(format="png", filename="exoplanet-3d"),
+                modeBarButtonsToAdd=[
+                    "resetCameraDefault3d",
+                    "resetCameraLastSave3d",
+                    "zoom3d",
+                    "pan3d",
+                    "orbitRotation",
+                    "tableRotation",
+                    "toggleSpikelines"
+                ]
+            )
+            st.plotly_chart(fig3d, use_container_width=True, config=config3d, theme=None, height=760)
 
         st.subheader("Parameter Distributions")
-        for col in numeric_cols:
-            st.write(f"#### Histogram of {col}")
-            st.markdown(f"Shows the distribution of {col.replace('_', ' ')} among all exoplanets in the dataset.")
-            fig_hist = px.histogram(df, x=col, nbins=30, title=f"Distribution of {col}", template='plotly_dark')
-            st.plotly_chart(fig_hist, use_container_width=True)
+        if len(numeric_cols):
+            for col in numeric_cols:
+                st.write(f"#### Histogram of {col}")
+                st.markdown(f"Shows the distribution of {col.replace('_', ' ')} in the dataset.")
+                fig_hist = px.histogram(df, x=col, nbins=30, title=f"Distribution of {col}", template='plotly_dark')
+                fig_hist.update_traces(marker_line_width=0)  # cleaner bars
+                st.plotly_chart(fig_hist, use_container_width=True)
+        else:
+            st.info("Upload a CSV with numeric columns to see distributions.")
 
 with tab4:
     st.title("Model Performance")
@@ -360,3 +492,17 @@ with tab4:
     **Coming Soon:**  
     This section will display results & predictions of the machine learning model compared to actual exoplanet classifications.
     """)
+
+with tab5:
+    st.title("Compare Model vs Actual Data (HTML)")
+    st.markdown("""
+    The embedded page shows side-by-side comparison with the same rules:
+    **white** (&lt; 0.25), **Blues gradient** (0.25–0.75), **dark blue** (≥ 0.75), and **red ring** for confirmed.
+    You can also pop either plot **full screen** for deeper inspection.
+    """)
+    try:
+        with open(APP_DIR / "comparison.html", "r", encoding="utf-8") as f:
+            html_content = f.read()
+        components.html(html_content, height=1000, scrolling=True)
+    except Exception as e:
+        st.error(f"Could not load comparison.html: {e}")
