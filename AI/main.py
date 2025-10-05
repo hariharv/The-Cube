@@ -41,7 +41,7 @@ scaler = scaler.fit(xData)
 xData = scaler.transform(xData)
 xEval = scaler.transform(xEval)
 
-history = model.fit(xData, yData, validation_data=(xEval, yEval), batch_size=64, epochs=200, verbose=1)
+history = model.fit(xData, yData, validation_data=(xEval, yEval), batch_size=64, epochs=300, verbose=1)
 evals = model.evaluate(xEval, yEval, verbose=1)
 print("Loss, Accuracy: ", evals)
 model.save("Mod8-16-8.h5")
