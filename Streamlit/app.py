@@ -6,7 +6,11 @@ import plotly.express as px
 st.set_page_config(page_title="Exoplanet Data Visualizer", layout="wide")
 
 with st.sidebar:
-    st.image("cube_logo.png", use_column_width=True)
+    LOGO_PATH = Path(__file__).parent / "cube_logo.png"
+    if LOGO_PATH.exists():
+        st.image(str(LOGO_PATH), use_column_width=True)
+    else:
+        st.warning(f"Logo not found at: {LOGO_PATH}")    
     st.markdown("### NASA SpaceApps Challenge")
     st.markdown("#### The Cube Project")
     st.markdown("---")
