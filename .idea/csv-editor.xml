@@ -24,28 +24,7 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\AI\data\merged1.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="\AI\data\toi.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\AI\remaining_70.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\AI\sample_30.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
