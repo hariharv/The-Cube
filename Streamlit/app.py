@@ -5,6 +5,50 @@ import base64
 from datetime import datetime
 from pathlib import Path
 
+from pathlib import Path
+import json
+import pandas as pd
+import plotly.express as px
+import streamlit as st
+
+# Repo-aware paths (app is inside /Streamlit)
+REPO_ROOT = Path(__file__).resolve().parent.parent
+ART_DIR = REPO_ROOT / "artifacts"   # each run has predictions.jsonl + metrics.json
+
+def list_runs():
+    if not ART_DIR.exists():
+        return []
+    return sorted(
+        [p for p in ART_DIR.iterdir() if p.is_dir() and (p / "predictions.jsonl").exists()],
+        key=lambda p: p.stat().st_mtime,
+        reverse=True
+    )
+
+def load_predictions(run_dir: Path) -> pd.DataFrame:
+    """Load predictions.jsonl and flatten feature dicts -> columns."""
+    path = run_dir / "predictions.jsonl"
+    if not path.exists():
+        return pd.DataFrame()
+    # read jsonl
+    records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if not records:
+        return pd.DataFrame()
+    # normalize features into columns
+    df = pd.json_normalize(records, sep=".")
+    # nicer column names: features.period_days -> period_days
+    df.columns = [c.replace("features.", "") for c in df.columns]
+    # ensure essential columns exist
+    for col in ["id", "score", "label_pred", "label_true", "candidate_name", "timestamp"]:
+        if col not in df.columns:
+            df[col] = None
+    return df
+
+def load_metrics(run_dir: Path) -> dict:
+    path = run_dir / "metrics.json"
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
 # ---- Define paths early ----
 APP_DIR = Path(__file__).resolve().parent
 LOGO_PATH = APP_DIR / "cube_logo.png"  # adjust if inside /assets
