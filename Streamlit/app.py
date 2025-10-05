@@ -10,17 +10,17 @@ st.set_page_config(page_title="Exoplanet Data Visualizer", layout="wide")
 APP_DIR = Path(__file__).resolve().parent
 LOGO_PATH = APP_DIR / "cube_logo.png"   # change to (APP_DIR / "assets" / "cube_logo.png") if you move it
 
-def show_logo(*, width=None, use_column_width=False):
+def show_logo(*, width=None, use_container_width=False):
     """Render the logo safely on Streamlit Cloud."""
     if LOGO_PATH.is_file():
-        st.image(str(LOGO_PATH), width=width, use_column_width=use_column_width)
+        st.image(str(LOGO_PATH), width=width, use_container_width=use_container_width)
     else:
         st.warning(f"Logo not found at: {LOGO_PATH}")
         # If you prefer hard-fail when missing logo, uncomment:
         # st.stop()
 
 with st.sidebar:
-    show_logo(use_column_width=True)  
+    show_logo(use_container_width=True)  
     st.markdown("### NASA SpaceApps Challenge")
     st.markdown("#### The Cube Project")
     st.markdown("---")
