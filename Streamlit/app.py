@@ -270,10 +270,21 @@ with tab1:
 
 with tab2:
     st.markdown(
-        "<div class='dark-card'><h2 style='margin:.25rem 0'>Project Information</h2>"
-        "<p><strong>Goal:</strong> Provide an interactive platform for visualizing and confirming exoplanet candidates.</p>"
-        "<ul><li>Supported archives: Kepler, K2, TOI (CSV)</li>"
-        "<li>Features: 2D/3D scatter, curated histograms, compact model-vs-actual summary</li></ul></div>",
+        """
+        <div class='dark-card'>
+            <h2 style='margin:.25rem 0'>Project Information</h2>
+            <p><strong>Goal:</strong> Provide an interactive platform for visualizing and confirming exoplanet candidates.</p>
+            <ul>
+                <li>Supported archives: Kepler, K2, TOI (CSV)</li>
+                <li>Features: 2D/3D scatter, curated histograms, compact model-vs-actual summary</li>
+                <li>Please upload CSV files in the following format:<br>
+                    <em>Orbital Period (days), Transit Duration (hrs), Transit Depth (ppm), Planet Radius (Earth Radii), 
+                    Planet Insolation Flux (Earth Flux), Planet Equilibrium Temperature (Kelvin), 
+                    Star Effective Temperature (Kelvin), Star Radius (solar radii)</em>
+                </li>
+            </ul>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
