@@ -8,6 +8,24 @@ import plotly.graph_objects as go
 import streamlit as st
 import streamlit.components.v1 as components
 
+
+# Inject CSS to set a starry background image
+st.markdown("""
+    <style>
+    /* Set background image */
+    .stApp {
+        background: url("https://i.ibb.co/fkLCh0J/star-bg.jpg");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }
+
+    /* Optional: Make text more readable */
+    .stMarkdown, .stText, h1, h2, h3, h4, h5, h6, p, div {
+        color: white !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 # ---------- Repo-aware paths ----------
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ART_DIR = REPO_ROOT / "artifacts"  # optional: model runs live here
@@ -236,7 +254,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(
 with tab1:
     st.markdown(
         "<div class='dark-card'><h2 style='margin:.25rem 0'>About Us</h2>"
-        "<p><strong>The Cube</strong> — a team exploring exoplanet discovery and habitability. "
+        "<p><strong>The Cube</strong> — a team exploring exoplanet discovery and habitability. Repo links is here - https://github.com/advikvenks/apollo67"
         "We visualize NASA archive data and compare against our ML model.</p></div>",
         unsafe_allow_html=True,
     )
