@@ -253,10 +253,19 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(
 
 with tab1:
     st.markdown(
-        "<div class='dark-card'><h2 style='margin:.25rem 0'>About Us</h2>"
-        "<p><strong>The Cube</strong> — We are a team exploring exoplanet discovery and habitability. The original repo link is here w/ more info- https://github.com/advikvenks/apollo67."
-        "We visualize NASA archive data and compare against our ML model.</p></div>",
-        unsafe_allow_html=True,
+        """
+        <div class="dark-card">
+            <h2 style="margin: .25rem 0;">About Us</h2>
+            <p style="line-height: 1.2; font-size: 14px;">
+                <strong>The Cube</strong><br>
+                We are a team exploring exoplanet discovery and habitability.<br>
+                The original repo link is here w/ more info — 
+                <a href="https://github.com/advikvenks/apollo67" target="_blank">GitHub Repo</a>.<br>
+                We visualize NASA archive data and compare against our ML model.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
 with tab2:
